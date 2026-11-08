@@ -1,0 +1,62 @@
+# Exemplos para o editor HTTP do Visual Studio. Substitua valores PRIVADAMENTE.
+# A base padrao exige o certificado local confiavel.
+@base = https://localhost:7147/api/v1
+@origin = https://localhost:7147
+
+### Saude
+GET {{base}}/health
+
+### Catalogos publicos (vazios ate configurar unidades e planos reais)
+GET {{base}}/public/units
+
+### Planos
+GET {{base}}/public/plans
+
+### Login administrativo
+# @name adminLogin
+POST {{base}}/auth/admin/login
+Origin: {{origin}}
+Content-Type: application/json
+
+{
+  "email": "PREENCHA_O_EMAIL_DO_PRESIDENTE",
+  "password": "PREENCHA_SUA_SENHA_LOCALMENTE"
+}
+
+### Sessao: o editor precisa reter/enviar o cookie de login.
+GET {{base}}/auth/admin/session
+
+### Bootstrap da Web
+GET {{base}}/admin/bootstrap
+
+### Tipos de area (Presidente)
+GET {{base}}/admin/areas/types
+
+### Areas (Presidente)
+GET {{base}}/admin/areas
+
+### Logout administrativo
+# Copie csrfToken da resposta de login/sessao. Envie o cookie da sessao.
+POST {{base}}/auth/admin/logout
+Origin: {{origin}}
+X-CSRF-Token: PREENCHA_O_CSRF_DA_SESSAO
+
+### Login Mobile
+POST {{base}}/auth/mobile/login
+Content-Type: application/json
+
+{
+  "email": "PREENCHA_O_EMAIL_DO_ASSOCIADO",
+  "senha": "PREENCHA_SUA_SENHA_LOCALMENTE"
+}
+
+### Minha Conta: token devolvido pelo login Mobile
+GET {{base}}/mobile/me
+Authorization: Bearer PREENCHA_O_TOKEN_MOBILE
+
+### Mensalidades
+GET {{base}}/mobile/invoices
+Authorization: Bearer PREENCHA_O_TOKEN_MOBILE
+
+### Para gravacoes, use Idempotency-Key: UUID novo por operacao.
+# A sintaxe integral de corpos e rotas esta em Docs/CONTRATO_API.openapi.json.

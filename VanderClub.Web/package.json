@@ -1,0 +1,9 @@
+{
+  "name": "vanderclub-web",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Portal administrativo VanderClub",
+  "scripts": {
+    "start": "node servir.cjs"
+  }
+}

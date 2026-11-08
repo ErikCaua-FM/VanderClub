@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<helpers:ClubPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+ xmlns:helpers="clr-namespace:VanderClub.Helpers" x:Class="VanderClub.Views.frmMinhaConta">
+ <ScrollView><VerticalStackLayout Padding="20,20,20,32" Spacing="14" MaximumWidthRequest="680">
+  <Label Text="Minha Conta" FontSize="28" FontAttributes="Bold" />
+  <Label Text="Mantenha seus dados atualizados e consulte sua associação." TextColor="#6F7481" />
+  <VerticalStackLayout x:Name="PlanoPanel" Spacing="12" />
+  <Label Text="Informações pessoais" FontSize="22" FontAttributes="Bold" Margin="0,12,0,0" />
+  <Label Text="Nome completo" /><Entry x:Name="Nome" MaxLength="200" />
+  <Label Text="E-mail de acesso" /><Entry x:Name="Email" Keyboard="Email" MaxLength="254" />
+  <Label Text="CPF" /><Entry x:Name="Cpf" Keyboard="Numeric" MaxLength="14" />
+  <Label Text="Nascimento" /><DatePicker x:Name="Nascimento" Format="dd/MM/yyyy" />
+  <Label Text="Telefone com DDD" /><Entry x:Name="Telefone" Keyboard="Telephone" MaxLength="20" />
+  <Label Text="Logradouro" /><Entry x:Name="Endereco" MaxLength="250" />
+  <Label Text="Número" /><Entry x:Name="Numero" MaxLength="20" />
+  <Label Text="Complemento" /><Entry x:Name="Complemento" MaxLength="100" />
+  <Label Text="Bairro" /><Entry x:Name="Bairro" MaxLength="100" />
+  <Label Text="Cidade" /><Entry x:Name="Cidade" MaxLength="150" />
+  <Label Text="UF" /><Picker x:Name="Uf" Title="Selecione a UF" />
+  <Label Text="CEP" /><Entry x:Name="Cep" Keyboard="Numeric" MaxLength="9" />
+  <Label Text="Sexo / gênero (opcional)" /><Entry x:Name="Sexo" MaxLength="30" />
+  <Label Text="Estado civil (opcional)" /><Entry x:Name="EstadoCivil" MaxLength="30" />
+  <Label Text="Interesses (opcional)" /><Editor x:Name="Interesses" MaxLength="500" AutoSize="TextChanges" MinimumHeightRequest="90" />
+  <Label Text="Alterações de e-mail passam a valer no próximo acesso. Seu plano e seu tipo de sócio são definidos pelo contrato." FontSize="13" TextColor="#6F7481" />
+  <Button x:Name="SalvarButton" Text="Salvar alterações" Clicked="Salvar" BackgroundColor="#484579" TextColor="White" CornerRadius="14" HeightRequest="52" IsEnabled="False" />
+ </VerticalStackLayout></ScrollView>
+</helpers:ClubPage>

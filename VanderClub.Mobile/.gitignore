@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+*.user
+*.db3
+*.db3-*
+*.keystore
+*.pfx

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<helpers:ClubPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+ xmlns:helpers="clr-namespace:VanderClub.Helpers" x:Class="VanderClub.Views.frmEventos">
+ <ScrollView><VerticalStackLayout Padding="20" Spacing="16" MaximumWidthRequest="680">
+  <Label Text="Bons momentos vêm aí" FontSize="26" FontAttributes="Bold" />
+  <Label x:Name="UnidadeLabel" TextColor="#6F7481" />
+  <SearchBar x:Name="Pesquisa" Placeholder="Buscar evento ou local" TextChanged="Filtrar" />
+  <Picker x:Name="FiltroStatus" Title="Situação do evento" SelectedIndexChanged="Filtrar" />
+  <Button Text="Atualizar programação" Clicked="Atualizar" BackgroundColor="#07839B" TextColor="White" />
+  <VerticalStackLayout x:Name="Lista" Spacing="16" />
+ </VerticalStackLayout></ScrollView>
+</helpers:ClubPage>

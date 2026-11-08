@@ -1,0 +1,7 @@
+VANDERCLUB WEB 2.0
+
+Leia README.md e docs/CONTRATO_API.md.
+Na próxima etapa, implemente a API e configure apiBaseUrl em dist/config.js.
+Execute npm start ou ABRIR_NO_WINDOWS.cmd e abra http://localhost:8080.
+O servidor incluído é estático. Sem API, o login real não será liberado.
+Não existem contas de teste, laboratório ou banco de demonstração.

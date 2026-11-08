@@ -1,0 +1,8 @@
+VANDERCLUB MOBILE 2.0
+
+Abra VanderClub.slnx ou VanderClub.csproj.
+Leia README.md e CONTRATO_API.md.
+As novas telas são frmEventos, frmDetalhesEvento e frmMinhaConta em Views.
+Na próxima etapa, implemente a API e configure Helpers/ApiConfig.cs.
+Não existem contas de teste, laboratório ou pagamentos simulados.
+O SQLite permanece como cache temporário.

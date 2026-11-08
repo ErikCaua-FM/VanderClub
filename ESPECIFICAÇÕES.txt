@@ -1,0 +1,2180 @@
+VANDERCLUB — ESPECIFICAÇÕES COMPLETAS DO SISTEMA
+IA UTILIZADA: ChatGPT Plus - GPT-6 Astra
+
+FINALIDADE DESTE DOCUMENTO
+
+Definir uma base única para desenvolver o aplicativo Mobile, o sistema Web
+administrativo, a API e o banco MySQL do VanderClub. Os requisitos abaixo
+consolidam a descrição do projeto, o TXT original e as duas fotografias enviadas.
+
+Este é um documento de especificação, não uma declaração de funcionalidades já
+implementadas. O dicionário de dados define o modelo a implementar; não é ainda
+um script SQL executável. Os testes indicados são critérios para validar a futura
+implementação.
+
+As funcionalidades solicitadas foram preservadas. Decisões complementares que
+não estavam definidas nas fontes são apresentadas como propostas ou parâmetros.
+As referências a loja, produtos e pedidos do arquivo original foram substituídas
+pelos conceitos próprios de uma rede de clubes.
+
+SUMÁRIO
+
+01. Visão, escopo e decisões de base
+02. Tecnologias e arquitetura
+03. Conceitos, perfis e permissões
+04. Fluxos principais
+05. Requisitos funcionais
+06. Requisitos não funcionais
+07. Regras de negócio
+08. Estados e transições
+09. Padrões do banco MySQL
+10. Dicionário de dados
+11. Relacionamentos, integridade e concorrência
+12. Contratos da API e comunicação em tempo real
+13. SQLite, sessão e sincronização
+14. Telas previstas
+15. Critérios de aceitação
+16. Sequência de implementação
+17. Parâmetros e decisões a validar
+18. Correções do modelo original e referências técnicas
+
+
+01. VISÃO, ESCOPO E DECISÕES DE BASE
+
+O VanderClub será uma plataforma para uma rede de clubes com unidades em
+diferentes cidades. Cada unidade terá cadastro, espaços, agenda, eventos,
+atendimentos, votação e chat próprios. A administração geral terá visão da rede;
+a administração local atuará exclusivamente na unidade à qual estiver vinculada.
+
+No Mobile, o interessado poderá conhecer os planos e contratar uma associação.
+O associado poderá acompanhar seu vínculo, solicitar a inclusão de dependentes
+e sócios convidados, reservar espaços, acompanhar e pagar cobranças, participar
+de eventos e votações permitidas, conversar no chat da unidade e falar de forma
+privada com a administração.
+
+Na Web existirão somente dois perfis administrativos: ADM_GERAL, também chamado
+Presidente, e ADM_LOCAL. A referência a tesoureiro nas fotos será atendida pelas
+atribuições financeiras do ADM_GERAL, sem criar um terceiro perfil Web.
+
+1.1. Escopo obrigatório do projeto
+
+- Cadastro de unidades, pessoas, contas e administradores.
+- Catálogo de planos por abrangência e condição de pagamento.
+- Contratação, vigência, renovação e histórico da associação.
+- Dependentes e convidados sujeitos à aprovação local.
+- Cobranças e pagamentos, com confirmação manual pelo ADM_GERAL e integração
+  de pagamentos online quando o provedor estiver definido.
+- Áreas reserváveis, disponibilidade, reservas e bloqueios de agenda.
+- Eventos por unidade, com indicação de público e controle de inscrições.
+- Solicitações, reclamações, elogios e atendimento particular.
+- Chat geral por unidade, com histórico e moderação.
+- Votações por unidade, restritas aos titulares elegíveis.
+- Notificações internas, auditoria, segurança e cache no Mobile.
+
+1.2. Decisões propostas para manter a primeira versão coerente
+
+Estas decisões complementam, mas não representam escolhas já confirmadas pelo
+responsável pelo projeto:
+
+- "Sócio fundador" será o nome de negócio do TITULAR do contrato. O sistema não
+  presume que essa pessoa tenha participado da fundação histórica da instituição.
+- Cada contrato terá uma unidade de origem. Um plano LOCAL dará acesso a essa
+  unidade específica; um plano REDE dará acesso às unidades ativas da rede.
+- A unidade eleitoral será a unidade de origem. Acesso à rede não multiplicará
+  o direito a voto em várias unidades.
+- O titular será responsável pelas reservas e pelas cobranças. Dependentes e
+  convidados aprovados poderão ter login próprio para os serviços permitidos.
+- Um ADM_LOCAL terá uma unidade por vez. Uma unidade poderá ter mais de um
+  ADM_LOCAL, se necessário, sem compartilhar credenciais.
+- A primeira versão trabalhará com um vínculo de associação efetivo por pessoa
+  em cada período. A renovação poderá ser preparada com vigência futura.
+- O atendimento particular será uma conversa vinculada a um chamado, preservando
+  protocolo e histórico. Não será necessário criar outro chat privado paralelo.
+- Reservas e inscrições em eventos serão gratuitas na base inicial. Cobranças
+  por locação, ingressos ou convidados avulsos exigirão extensão explícita do
+  modelo financeiro antes de serem implementadas.
+- A votação inicial será identificada no banco e restrita na interface. Não se
+  prometerá voto secreto nem anonimato perante operadores do banco.
+
+1.3. Evoluções possíveis, sem ampliar silenciosamente o escopo
+
+Carteirinha com QR Code e controle físico de acesso; notificações push; fila de
+espera; pagamentos de locação e ingressos; anexos no chat geral; mensagens de voz;
+chamadas; conversa direta entre associados; reservas recorrentes; votação secreta
+com protocolo próprio; relatórios analíticos avançados e integração contábil.
+
+O termo "simpatizante", presente nas fotos, será tratado inicialmente como público
+externo de eventos abertos. Ele não cria associação, direito a voto nem acesso ao
+chat. Se for uma categoria associativa formal, deverá ser especificada antes de
+incluir um quarto tipo de membro.
+
+
+02. TECNOLOGIAS E ARQUITETURA
+
+2.1. Tecnologias preservadas do TXT original
+
+- Aplicativo Mobile: C#, .NET MAUI, XAML e SQLite para cache local.
+- API: C# e ASP.NET Core Web API.
+- Aplicação Web: ASP.NET Core MVC, com Views Razor.
+- Banco central: MySQL com tabelas InnoDB e caracteres utf8mb4.
+- Ambiente de desenvolvimento: Visual Studio Code, SDKs e ferramentas exigidos
+  pelas plataformas escolhidas.
+- Controle de versão: Git e GitHub. Um repositório público poderá conter código,
+  documentação e exemplos fictícios, mas nunca credenciais ou dados reais.
+
+2.2. Complementos técnicos propostos
+
+- ASP.NET Core SignalR para mensagens e avisos em tempo real.
+- OpenAPI para documentar requisições, respostas e autenticação da API.
+- Acesso a dados por Entity Framework Core com provedor MySQL compatível, ou
+  MySqlConnector com consultas parametrizadas. A escolha será fechada antes da
+  criação das migrações, mantendo uma única estratégia no projeto.
+- MySQL 8.4 como referência para o modelo. Fixar versões compatíveis de .NET,
+  MAUI, bibliotecas e provedor de dados no início da implementação.
+- Android como primeiro alvo sugerido para homologação do Mobile. Outras
+  plataformas dependerão do ambiente e do escopo acordado.
+
+2.3. Responsabilidade de cada componente
+
+Mobile: apresentar dados e ações do associado; consumir API e SignalR; guardar
+apenas o cache necessário. Nenhuma decisão de autorização dependerá do SQLite.
+
+Web: apresentar funções administrativas e consumir a API com a identidade do
+administrador. Não conectará diretamente ao MySQL e não terá uma cópia própria
+das regras de negócio.
+
+API: autenticar, autorizar por operação e unidade, validar entradas, executar
+regras, controlar transações, registrar auditoria e acessar o MySQL. Os trabalhos
+em segundo plano e os eventos do provedor financeiro usarão os mesmos serviços
+de domínio da API.
+
+MySQL: fonte oficial dos dados de negócio e dos históricos. Será acessível pela
+camada de servidor, sem exposição direta aos aplicativos clientes.
+
+SQLite: cópia local descartável de dados autorizados. Apagar o cache não apagará
+contratos, pagamentos, mensagens ou reservas do servidor.
+
+Provedor financeiro: emitir cobranças e confirmar transações reais. A API tratará
+a integração; segredos e credenciais desse provedor nunca irão para o Mobile.
+
+2.4. Organização sugerida da solução
+
+VanderClub.Mobile: telas, ViewModels, clientes da API e cache.
+VanderClub.Web: Controllers MVC, Views e clientes administrativos da API.
+VanderClub.Api: endpoints, autenticação, autorização e hubs SignalR.
+VanderClub.Application: casos de uso e validações de negócio.
+VanderClub.Domain: entidades, estados e regras centrais.
+VanderClub.Infrastructure: MySQL, arquivos, pagamentos e serviços externos.
+VanderClub.Contracts: DTOs públicos, sem senha_hash ou entidades de persistência.
+VanderClub.Tests: testes das regras e integrações críticas.
+
+Essa separação é lógica; não exige microsserviços ou infraestrutura distribuída.
+
+
+03. CONCEITOS, PERFIS E PERMISSÕES
+
+3.1. Conceitos que não devem ser confundidos
+
+Pessoa: indivíduo cadastrado, com ou sem conta de acesso.
+Usuário: credencial de autenticação vinculada a uma pessoa.
+Plano: produto associativo oferecido pela rede.
+Versão do plano: conjunto imutável de benefícios, abrangência e regras publicadas.
+Condição de pagamento: forma de quitar uma versão do plano, como anual à vista
+ou anual em 12 parcelas de boleto.
+Contrato: adesão de um titular a uma versão e condição, com valores e vigência.
+Membro do contrato: pessoa beneficiária, classificada como titular, dependente ou
+convidado. Seu tipo não é um perfil administrativo.
+Fatura: valor devido em um vencimento. Uma anuidade à vista gera uma fatura;
+um plano anual em 12 parcelas gera 12 faturas, conforme a condição contratada.
+Pagamento: tentativa ou registro de quitação de uma fatura.
+Estorno: reversão registrada de um pagamento, sem apagar o registro original.
+Unidade selecionada: contexto de navegação do Mobile, validado pela API.
+Unidade de origem: unidade à qual o contrato e a representação eleitoral estão
+vinculados, independentemente da abrangência de acesso.
+
+3.2. ADM_GERAL / Presidente — Web
+
+- Será criado no provisionamento inicial, por rotina segura e idempotente.
+- Cadastrará, editará e desativará unidades e administradores locais.
+- Publicará planos, versões, condições de pagamento e limites de benefícios.
+- Consultará os associados e indicadores de toda a rede.
+- Confirmará pagamentos manuais, rejeitará comprovantes e registrará correções
+  ou estornos com justificativa e rastreabilidade.
+- Acompanhará pagamentos confirmados pelo provedor e divergências financeiras.
+- Supervisionará eventos, reservas, atendimentos, aprovações, chat e votações.
+- Poderá realizar intervenção operacional em qualquer unidade, com auditoria.
+- Não poderá editar votos já registrados, inventar confirmações do provedor
+  ou apagar históricos financeiros para corrigir erros.
+
+3.3. ADM_LOCAL — Web
+
+- Consultará o cadastro operacional dos associados da própria unidade.
+- Aprovará ou rejeitará dependentes e convidados dos contratos dessa unidade.
+- Gerenciará áreas, horários, bloqueios, reservas e eventos locais.
+- Atenderá chamados e conversas particulares da unidade.
+- Criará e conduzirá votações locais e moderará o chat local.
+- Consultará a situação de elegibilidade do associado e um resumo financeiro
+  necessário ao atendimento, sem acesso à conciliação financeira da rede.
+- Não criará outros administradores, não alterará o catálogo global de planos,
+  não confirmará pagamentos e não acessará documentos privados de outra unidade.
+
+3.4. TITULAR / sócio fundador — Mobile
+
+- Contratará e renovará seu plano; consultará seu contrato e suas faturas.
+- Solicitará inclusão e remoção de dependentes e convidados dentro dos limites.
+- Realizará e cancelará suas reservas conforme as regras da área.
+- Participará dos eventos, chamados e chats das unidades autorizadas.
+- Votará somente nas votações para as quais a API confirmar elegibilidade.
+- Não acessará dados privados de outros titulares nem aprovará seus beneficiários.
+
+3.5. DEPENDENTE e CONVIDADO aprovados — Mobile
+
+- Poderão ter conta individual, quando adequado à idade e às regras de cadastro.
+- Consultarão o próprio vínculo, eventos, notificações e dados permitidos.
+- Poderão acessar o chat e abrir chamados da unidade autorizada.
+- Poderão inscrever-se em eventos, respeitando público e capacidade.
+- Não votarão, não contratarão em nome do titular, não gerenciarão outros membros
+  e não verão faturas ou documentos financeiros do titular.
+- Na base proposta, não criarão reservas; o titular será o responsável por elas.
+
+3.6. Interessado sem contrato e público externo
+
+Poderão conhecer unidades, planos e eventos públicos pelo Mobile. Uma conta
+recém-criada não concede automaticamente acesso aos serviços de associado.
+Inscrições externas em eventos abertos poderão ser registradas pelo ADM_LOCAL,
+sem criar um perfil administrativo ou conceder associação ao visitante.
+
+3.7. Princípio de acesso
+
+Permissão será a combinação da identidade, função, vínculo, unidade, estado do
+recurso e regra da operação. Ocultar um botão não substitui validação na API.
+Uma pessoa com função administrativa só terá voto se também for titular elegível.
+Trocar clube_id ou outro identificador na requisição não ampliará permissões.
+
+
+04. FLUXOS PRINCIPAIS
+
+4.1. Nova associação
+
+1. O interessado acessa "Assinar um plano" e consulta opções e unidades.
+2. Seleciona abrangência, unidade de origem e condição de pagamento.
+3. Visualiza preço total, parcelas, vigência, limites e condições aplicáveis.
+4. Cadastra ou confirma seus dados, verifica seu contato e aceita os documentos.
+5. A API valida a oferta e registra contrato pendente, titular e faturas em uma
+   transação. O servidor calcula os valores, sem confiar em preços enviados pelo app.
+6. O usuário inicia o pagamento. A tela diferencia emitido, em análise e confirmado.
+7. A confirmação válida da primeira fatura habilita a ativação, se o contrato
+   estiver dentro das condições e datas estabelecidas.
+8. O Mobile atualiza contrato, benefícios e cobranças pela API.
+
+4.2. Inclusão de dependente ou convidado
+
+1. O titular seleciona o tipo e informa os dados necessários.
+2. A API identifica ou cadastra a pessoa sem revelar cadastros de terceiros.
+3. Cria um vínculo pendente e uma solicitação de aprovação, com protocolo.
+4. O ADM_LOCAL da unidade de origem confere os dados e a documentação.
+5. A aprovação revalida, sob transação, vínculo, duplicidade e limites do plano.
+6. O sistema registra responsável, decisão, justificativa e data.
+7. Após aprovação, o titular é notificado. Uma conta própria, se aplicável, será
+   ativada por convite seguro; o titular não receberá a senha de outra pessoa.
+8. Uma rejeição não libera benefícios e pode ser seguida de nova solicitação.
+
+4.3. Reserva de área
+
+1. O titular escolhe uma unidade autorizada e uma área.
+2. Consulta capacidade, horários, regras, bloqueios e disponibilidade.
+3. Informa início e fim completos, incluindo datas diferentes quando necessário.
+4. A API verifica vínculo, regularidade exigida, limites e conflitos em transação.
+5. A reserva e a ocupação são gravadas juntas; apenas então aparece confirmação.
+6. A agenda administrativa é atualizada e o titular recebe notificação.
+
+4.4. Pagamento e conciliação
+
+No modo manual, o associado consulta a cobrança e envia comprovante. O pagamento
+fica EM_ANALISE até o ADM_GERAL verificar o recebimento e confirmar ou rejeitar.
+Anexar um comprovante nunca significa que a fatura foi paga.
+
+No modo integrado, o app oferece boleto, Pix ou checkout conforme o provedor
+configurado. O servidor confirma a transação por comunicação autenticada com o
+provedor. O retorno visual do navegador não basta para dar baixa na fatura.
+
+A especificação completa inclui pagamento online; uma demonstração com provedor
+simulado ou somente comprovantes deve ser identificada como etapa parcial.
+
+4.5. Atendimento e chat
+
+O associado pode abrir uma solicitação, reclamação, elogio ou atendimento
+particular. As mensagens ficam no protocolo, acessíveis ao autor e à equipe
+autorizada. O chat geral é separado, visível aos membros autorizados da unidade,
+com regras de convivência, denúncia e moderação.
+
+4.6. Votação
+
+1. O ADM_LOCAL cria título, pauta, opções, prazo e regras da votação.
+2. Ao abrir, a API registra o eleitorado elegível da unidade.
+3. Cada titular elegível confirma uma opção uma única vez.
+4. A API valida novamente a autorização e grava o voto de forma atômica.
+5. Ao encerrar, publica os totais agregados e informa eventual empate ou falta
+   de quórum. Dependentes e convidados não participam da votação.
+
+
+05. REQUISITOS FUNCIONAIS
+
+Identificadores RF serão usados na implementação e nos critérios de aceitação.
+
+CADASTRO, IDENTIDADE E ADMINISTRAÇÃO
+
+RF-001 — Apresentar no Mobile as opções "Entrar" e "Assinar um plano", além da
+consulta pública de unidades, planos e eventos abertos.
+RF-002 — Cadastrar e atualizar pessoas com validação de dados, CPF quando exigido,
+endereço, nascimento, contatos e interesses opcionais.
+RF-003 — Autenticar usuários, recuperar acesso por token temporário, verificar
+contatos, encerrar sessões e permitir troca segura de senha.
+RF-004 — Manter a sessão ao fechar o app quando houver credencial válida;
+reautenticar quando ela expirar ou for revogada.
+RF-005 — Provisionar o ADM_GERAL inicial sem cadastro público de administradores.
+RF-006 — Permitir ao ADM_GERAL cadastrar, editar e desativar clubes e respectivos
+endereços, contatos, fuso e situação operacional.
+RF-007 — Permitir ao ADM_GERAL cadastrar e desativar ADMs locais e alterar seu
+vínculo de unidade, revogando os acessos anteriores.
+RF-008 — Exibir no painel geral dados consolidados da rede e, no painel local,
+somente dados autorizados da unidade.
+
+PLANOS, CONTRATOS E BENEFICIÁRIOS
+
+RF-009 — Cadastrar planos e publicar versões com benefícios, abrangência,
+vigência, limites de dependentes e convidados e regras de uso.
+RF-010 — Cadastrar condições de pagamento distintas, incluindo anual à vista e
+anual parcelado em boleto; apresentar total e quantidade de parcelas.
+RF-011 — Relacionar versões de planos locais às unidades em que podem ser
+contratadas e validar a unidade selecionada pelo interessado.
+RF-012 — Contratar pelo Mobile, preservando a versão da oferta, os valores,
+as condições aceitas, o titular, a unidade e as datas de vigência.
+RF-013 — Exibir contrato, beneficiários, vigência, regularidade e serviços
+habilitados, com motivo quando alguma ação estiver indisponível.
+RF-014 — Permitir ao titular solicitar inclusão, atualização relevante e remoção
+de dependentes e convidados, acompanhando os pedidos.
+RF-015 — Permitir à administração local analisar solicitações, registrar a
+decisão e consultar documentos autorizados.
+RF-016 — Habilitar login individual para beneficiários aprovados sem compartilhar
+a conta ou as credenciais do titular.
+RF-017 — Permitir renovação, encerramento e solicitação de mudança de plano,
+preservando os contratos anteriores e suas cobranças.
+
+COBRANÇAS E PAGAMENTOS
+
+RF-018 — Gerar faturas de acordo com a condição contratada, com parcela,
+vencimento, valor e vínculo ao contrato.
+RF-019 — Exibir ao titular faturas abertas, vencidas, quitadas e canceladas,
+além do histórico de pagamentos e estornos.
+RF-020 — Iniciar pagamentos pelo Mobile usando meios habilitados pelo provedor
+ou registrar comprovante no fluxo manual claramente identificado.
+RF-021 — Permitir ao ADM_GERAL confirmar ou rejeitar pagamentos manuais,
+registrando data efetiva, valor, referência e justificativa.
+RF-022 — Processar confirmações e estornos do provedor com autenticidade,
+idempotência e tratamento de divergências.
+RF-023 — Disponibilizar ao ADM_GERAL filtros e relatórios de recebimentos,
+vencimentos, inadimplência e conciliação por período, contrato e unidade.
+RF-024 — Aplicar as restrições de benefícios por inadimplência conforme o
+contrato, preservando o acesso do titular ao pagamento e ao atendimento.
+
+ESPAÇOS, RESERVAS E EVENTOS
+
+RF-025 — Cadastrar áreas por unidade, com descrição, capacidade, horários,
+antecedência, duração e regras de cancelamento.
+RF-026 — Consultar agenda com reservas, eventos e bloqueios que ocupem áreas,
+sem expor dados privados de quem fez outra reserva.
+RF-027 — Criar reservas com data/hora inicial e final; impedir sobreposições,
+inclusive em requisições simultâneas e reservas que atravessem a meia-noite.
+RF-028 — Cancelar reservas conforme permissões e prazos, mantendo o histórico
+e liberando a ocupação correspondente.
+RF-029 — Permitir bloqueios administrativos por manutenção ou indisponibilidade,
+sem cancelar reservas existentes silenciosamente.
+RF-030 — Cadastrar, publicar, atualizar e cancelar eventos locais, informando
+período, público-alvo, capacidade e local.
+RF-031 — Registrar inscrições, cancelamentos e presença em eventos; controlar
+lotação e impedir inscrição duplicada da mesma pessoa.
+RF-032 — Associar eventos às áreas utilizadas e aplicar a mesma verificação
+de conflito usada pelas reservas.
+
+ATENDIMENTO E COMUNICAÇÃO
+
+RF-033 — Abrir chamados de solicitação, reclamação, elogio e atendimento
+particular, com protocolo, unidade, assunto, texto e anexo opcional.
+RF-034 — Trocar mensagens privadas no chamado, atribuir responsável e acompanhar
+estados, solução e reabertura.
+RF-035 — Oferecer chat geral por unidade com envio e recebimento de texto,
+histórico paginado, indicação de falha de envio e retomada após reconexão.
+RF-036 — Permitir selecionar uma unidade autorizada para navegar e conversar;
+a localização física por GPS não será obrigatória.
+RF-037 — Permitir denúncia de mensagens, ocultação por moderação e suspensão
+temporária de envio no chat, com justificativa e auditoria.
+RF-038 — Exibir notificações internas de pagamentos, aprovações, respostas,
+reservas, eventos e votações, com leitura individual.
+
+VOTAÇÕES
+
+RF-039 — Permitir à administração local criar, agendar, abrir, encerrar ou
+cancelar votações da unidade, com opções e regras explícitas.
+RF-040 — Identificar titulares elegíveis, registrar o eleitorado e impedir
+votos de dependentes, convidados ou pessoas de outras unidades eleitorais.
+RF-041 — Registrar no máximo um voto por pessoa por votação, com confirmação
+de recebimento e proteção contra envio duplicado.
+RF-042 — Exibir resultados agregados após o encerramento, participação, quórum
+e empate quando aplicáveis, sem disponibilizar escolhas individuais na interface.
+
+OPERAÇÃO, HISTÓRICO E SINCRONIZAÇÃO
+
+RF-043 — Sincronizar dados autorizados para o SQLite e indicar a última
+atualização e o funcionamento offline.
+RF-044 — Limpar cache privado, arquivos temporários e credenciais locais ao
+sair da conta ou trocar de usuário.
+RF-045 — Registrar ações administrativas e alterações críticas em auditoria,
+com autor, data, unidade, operação e justificativa quando exigida.
+RF-046 — Disponibilizar pesquisa, filtros e paginação nas listas administrativas
+e nos históricos extensos do Mobile.
+RF-047 — Desativar registros sem destruir relações ou históricos; permitir
+correção cadastral com controle de permissões.
+RF-048 — Expor todos os casos de uso pela API, com erros padronizados,
+autorização consistente e documentação de integração.
+RF-049 — Registrar a versão dos termos e políticas apresentados e os respectivos
+aceites ou ciências, incluindo responsável quando necessário.
+RF-050 — Executar rotinas seguras para vencimentos, expiração de propostas,
+encerramento de contratos, abertura/fechamento de votações e avisos pendentes.
+
+
+06. REQUISITOS NÃO FUNCIONAIS
+
+As metas numéricas abaixo são propostas de homologação, não resultados medidos.
+
+RNF-001 — Toda comunicação de produção entre clientes e servidor usará HTTPS;
+SignalR usará transporte protegido. Não desabilitar validação de certificado.
+RNF-002 — Senhas serão armazenadas somente como hash adaptativo com salt, usando
+implementação consolidada. Nunca guardar senha em texto, hash simples de senha,
+senha reversível, código-fonte ou SQLite.
+RNF-003 — Aplicar autorização na API por identidade, papel, unidade e recurso,
+incluindo downloads, relatórios, rotas SignalR e tarefas administrativas.
+RNF-004 — Proteger login, recuperação, uploads, pagamentos e chat contra abuso,
+com limites por usuário/IP e sem revelar se um CPF ou e-mail pertence a terceiros.
+RNF-005 — Usar consultas parametrizadas, validação de DTOs, saída HTML codificada,
+proteção contra CSRF nas ações Web com cookie e CORS restrito às origens previstas.
+RNF-006 — Tokens de renovação ficarão no armazenamento seguro da plataforma
+Mobile. Tokens do administrador permanecerão no servidor Web quando usado o
+modelo de sessão com cookie. Não guardar tokens sensíveis no localStorage.
+RNF-007 — Aplicar minimização de dados, controle de retenção, acesso restrito a
+documentos e fluxos de correção/eliminação quando cabíveis. A política de dados,
+incluindo menores, será validada antes do uso com pessoas reais.
+RNF-008 — Usar transações e integridade referencial. Uma falha não poderá deixar
+uma reserva sem ocupação, um voto parcialmente gravado ou uma cobrança duplicada.
+RNF-009 — Falhas da API devem produzir mensagem compreensível, opção segura de
+tentar novamente e preservação de rascunhos quando apropriado, sem encerrar o app.
+RNF-010 — Repetições de operações críticas não poderão gerar efeitos duplicados.
+Retentativas automáticas só ocorrerão quando seguras e com espera progressiva.
+RNF-011 — Para homologação proposta: 95% das consultas comuns em até 2 segundos
+e gravações comuns em até 3 segundos, com 100 usuários ativos simultâneos, em
+ambiente e rede de teste documentados, excluindo tempo do provedor financeiro.
+RNF-012 — Meta proposta do chat: entrega em até 2 segundos para 95% das mensagens
+com 50 conexões ativas em uma unidade, sob as mesmas condições de homologação.
+RNF-013 — Páginas terão até 50 itens por padrão e limite de 100. Históricos de
+chat serão carregados por cursor, sem baixar todas as mensagens.
+RNF-014 — Interface em português do Brasil, moeda BRL, datas legíveis, contraste,
+foco de teclado na Web, rótulos acessíveis e adaptação a tamanhos de tela.
+RNF-015 — Guardar instantes em UTC e apresentar horários no fuso da unidade.
+Validar ambiguidades de horário quando houver mudança de fuso ou horário sazonal.
+RNF-016 — Implantação operacional proposta: disponibilidade mensal de 99,5%,
+com monitoramento. Essa meta dependerá da hospedagem escolhida, não do notebook
+de desenvolvimento.
+RNF-017 — Fazer backups automáticos do MySQL e dos arquivos, com acesso restrito;
+meta inicial proposta de perda máxima de 24 horas e restauração em até 4 horas.
+Homologar a restauração, não apenas a criação do backup.
+RNF-018 — Logs terão identificador de correlação, duração e resultado da operação.
+Não registrar senhas, tokens, documentos completos, dados de cartão ou votos
+individuais em logs de aplicação.
+RNF-019 — Versionar migrações, configuração de exemplo e instruções de execução.
+Separar desenvolvimento, homologação e produção, usando dados fictícios em testes.
+RNF-020 — Testar obrigatoriamente isolamento entre unidades, escopo de cada
+perfil, concorrência em reservas/votos/pagamentos e limpeza do cache entre contas.
+RNF-021 — Usar tratamento centralizado de erros e respostas sem detalhes internos
+do banco, stack traces ou segredos em produção.
+RNF-022 — Validar tamanho e conteúdo de anexos, usar nomes internos aleatórios e
+armazenamento privado. Proposta inicial: JPEG, PNG ou PDF, até 10 MiB por arquivo.
+
+
+07. REGRAS DE NEGÓCIO
+
+IDENTIDADE, VÍNCULOS E UNIDADES
+
+RN-001 — Conta de acesso, pessoa e vínculo de associação são conceitos distintos.
+Criar conta não torna a pessoa associada nem concede direitos administrativos.
+RN-002 — Somente o provisionamento autorizado cria o ADM_GERAL inicial. O cadastro
+público sempre cria perfil ASSOCIADO, sem aceitar um perfil enviado pelo cliente.
+RN-003 — O ADM_LOCAL só atua na unidade vinculada. O ADM_GERAL possui escopo da
+rede, respeitando as regras e a auditoria de cada operação.
+RN-004 — CPF válido, quando informado, identifica uma única pessoa na rede.
+E-mail de login normalizado identifica uma única conta. Não usar e-mail do titular
+como login compartilhado de todos os dependentes.
+RN-005 — CPF será obrigatório para titulares e administradores. Para dependentes
+menores sem CPF informado, a proposta é exigir responsável e conferência local,
+sem inventar um CPF; uma política mais restritiva poderá ser adotada.
+RN-006 — TITULAR, DEPENDENTE e CONVIDADO são tipos do vínculo contratual. Um membro
+não pode alterar seu próprio tipo para ganhar voto ou benefícios.
+RN-007 — Cada contrato tem exatamente um titular. A pessoa titular também possui
+um registro de membro TITULAR; ambos devem ser criados na mesma transação.
+RN-008 — A pessoa não poderá manter vínculos efetivos simultâneos em contratos
+com períodos sobrepostos. Mudanças de tipo ou titularidade exigem fluxo próprio,
+preservando o histórico; não serão feitas por simples edição do campo tipo.
+RN-009 — Dependente ou convidado só recebe benefícios após aprovação. Pendência,
+rejeição, suspensão ou remoção não habilitam serviços de associado.
+RN-010 — O ADM_LOCAL que aprova é o da unidade de origem do contrato. Uma unidade
+visitada por um membro de plano REDE não assume o processo de aprovação dele.
+RN-011 — Pendências e membros ativos consomem a cota de seu tipo, para impedir
+pedidos ilimitados. Rejeitados e removidos deixam de consumir cota. A aprovação
+deve revalidar o limite sob bloqueio do contrato.
+RN-012 — Identidade ou tipo de um membro já aprovado não serão substituídos por
+edição silenciosa. Correções materiais exigem conferência; substituição de pessoa
+exige encerrar o vínculo e abrir outra solicitação.
+
+PLANOS E CONTRATOS
+
+RN-013 — O catálogo separará benefícios, abrangência, duração e forma de pagamento.
+Parcelar em 12 vezes não transforma automaticamente um contrato anual em contrato
+mensal renovável.
+RN-014 — No plano LOCAL, o contrato autoriza uma unidade específica escolhida
+entre as permitidas. Duas unidades na mesma cidade continuam sendo unidades
+diferentes; um plano municipal exigiria uma abrangência adicional.
+RN-015 — No plano REDE, a proposta é incluir todas as unidades ativas, inclusive
+novas unidades abertas durante a vigência. A unidade de origem continua definida.
+RN-016 — Versões e condições já contratadas serão imutáveis. Mudanças comerciais
+geram nova versão; desativar uma oferta impede novas vendas, sem reescrever contratos.
+RN-017 — Preço total, parcelas, abrangência, limites e regras contratadas serão
+preservados por referência a versões imutáveis e pelos dados financeiros do contrato.
+RN-018 — Para ativar o contrato, será necessário cadastro válido, aceite exigido
+e confirmação da primeira fatura. Um contrato pago com início futuro só libera
+benefícios a partir do início da vigência.
+RN-019 — Vigência será o intervalo [inicio_em, fim_em): inclui o início e exclui
+o fim. Planos em meses usam meses de calendário, não uma quantidade fixa de dias.
+RN-020 — Renovação cria novo contrato ligado ao anterior. A cópia dos beneficiários
+aprovados dependerá da manutenção da identidade, das condições e dos novos limites;
+se forem incompatíveis, a renovação exigirá resolução antes de liberar benefícios.
+RN-021 — Na base inicial, mudança de plano ocorre na renovação. Alteração no meio
+da vigência deverá ser tratada pela administração, com proposta e ajuste financeiro
+explícitos; não há cálculo proporcional automático presumido.
+
+FINANCEIRO
+
+RN-022 — A soma das faturas da contratação deverá corresponder exatamente ao
+valor total acordado. Diferenças de centavos do rateio serão ajustadas na última
+parcela, usando decimal, nunca float ou double.
+RN-023 — Faturas mensais usarão o dia de vencimento acordado. Se o mês não possuir
+esse dia, usarão o último dia do mês; a mudança não altera os meses seguintes.
+RN-024 — Uma fatura estará vencida quando a data local de hoje na unidade de
+origem ultrapassar seu vencimento, enquanto houver saldo em aberto. Parcelas
+futuras não caracterizam inadimplência.
+RN-025 — Somente o ADM_GERAL confirma pagamentos manuais. A integração poderá
+confirmar automaticamente recebimentos comprovados pelo provedor; a responsabilidade
+administrativa e a conciliação continuam com o ADM_GERAL.
+RN-026 — Na versão inicial, cada pagamento quita integralmente uma única fatura;
+pagamentos parciais, descontos negociados e juros automáticos ficam fora da base.
+Valor divergente exige análise, sem alterar o valor original para "fechar" a conta.
+RN-027 — Uma fatura só admite uma quitação efetiva. Duas confirmações simultâneas
+serão serializadas; recebimento externo excedente vira divergência a resolver,
+sem ser ignorado ou contado como receita de outra fatura.
+RN-028 — Comprovante, página de sucesso, botão "já paguei" e mensagem do cliente
+não confirmam pagamento. Notificações do provedor precisam de validação e deduplicação.
+RN-029 — Correções financeiras serão registradas como reversões, com motivo,
+responsável e referência. Um estorno comercial não desfaz a dívida automaticamente:
+o caso deverá definir se a fatura reabre ou é cancelada legitimamente.
+RN-030 — A tolerância de atraso é parâmetro da versão do plano. Após esse prazo,
+a proposta é bloquear novas reservas e uso do chat geral até regularização,
+mantendo login, faturas, pagamentos e atendimento particular disponíveis.
+RN-031 — Inadimplência é apurada pelas faturas e não apaga nem cancela o contrato
+automaticamente. Suspensão administrativa é outro fato e exige motivo próprio.
+RN-032 — Cancelar ou encerrar contrato não exclui cobranças já existentes. O
+tratamento de obrigações futuras e de eventual devolução depende da política aceita
+e de decisão registrada, sem presumir perdão ou reembolso automático.
+
+RESERVAS E EVENTOS
+
+RN-033 — Apenas titular habilitado reserva na base inicial. Ele deve possuir
+cobertura da unidade e informar quantidade de participantes dentro da capacidade.
+RN-034 — O fim deve ser posterior ao início. Todo o intervalo deve respeitar
+funcionamento, antecedência, duração máxima e término da vigência do contrato.
+RN-035 — Há sobreposição quando novo_inicio < fim_existente E novo_fim >
+inicio_existente. Uma reserva que termina às 14h pode ser seguida por outra que
+começa às 14h, se a área não exigir intervalo adicional.
+RN-036 — Reservas, eventos e manutenção utilizam a mesma agenda de ocupações.
+A simples consulta de disponibilidade antes de salvar não garante exclusividade:
+a API deve bloquear a área e repetir a verificação dentro da transação.
+RN-037 — Cancelamentos respeitam o prazo da área, registrado na reserva. Exceções
+administrativas exigem justificativa e notificação. Um reagendamento será, na
+primeira versão, cancelamento seguido de nova reserva, deixando esse efeito claro.
+RN-038 — Desativação de área, evento novo ou manutenção não apagam reservas já
+confirmadas. Conflitos precisam de resolução explícita antes da nova ocupação.
+RN-039 — Eventos terão público ASSOCIADOS ou PUBLICO. Para associados, a API
+verifica cobertura e vínculo. Evento público não libera chat, votação ou associação
+a participantes externos.
+RN-040 — Cada pessoa ocupa uma vaga por inscrição, salvo futura regra explícita
+de convidados adicionais. A capacidade não pode ser excedida por envios simultâneos.
+
+CHAT, ATENDIMENTO E VOTAÇÕES
+
+RN-041 — Cada unidade terá um chat geral. Selecionar uma unidade no app só libera
+o chat se a API confirmar permissão; não será exigida geolocalização.
+RN-042 — O ADM_LOCAL modera somente o chat local. A ação de ocultar uma mensagem
+preserva o registro e o motivo, sujeitos à política de retenção.
+RN-043 — Chamados e mensagens particulares não aparecem no chat geral. O autor
+e a equipe autorizada acessam o conteúdo; dependentes não herdam acesso aos chamados
+privados do titular, nem o titular acessa automaticamente todo chamado de adulto
+convidado ou dependente com conta própria.
+RN-044 — Somente TITULAR elegível vota. Perfil administrativo por si só não concede
+voto, e dependentes/convidados não recebem votos adicionais por contrato.
+RN-045 — A proposta é votar na unidade de origem. O eleitorado é fixado na abertura;
+novos titulares após essa data aguardam a próxima votação. Na hora do voto, deve
+permanecer a elegibilidade atual da pessoa, inclusive após uma renovação válida.
+RN-046 — A exigência de adimplência para votar será um parâmetro explícito de cada
+votação, definido antes da publicação. Padrão proposto: não exigir, pois essa
+restrição não foi determinada pelo pedido. O bloqueio financeiro de outros serviços
+não deve ser reaproveitado indevidamente para impedir esse voto.
+RN-047 — Há no máximo um voto por pessoa por votação, independente de dispositivo,
+sessão ou renovação de contrato. O voto confirmado não poderá ser alterado.
+RN-048 — Opções e regras ficam congeladas após publicação. Apuração é agregada
+e liberada após encerramento. Correção de votação encerrada exige nova votação,
+não alteração retroativa de votos.
+RN-049 — Em caso de empate, não haverá vencedor automático. Se houver quórum
+mínimo, ele será calculado sobre o eleitorado registrado na abertura; eventual
+opção em branco conta para participação, não como opção vencedora.
+
+HISTÓRICO E SEGURANÇA
+
+RN-050 — MySQL é a fonte oficial. SQLite, notificações e mensagens SignalR não
+substituem consulta autorizada à API para decisões críticas.
+RN-051 — Logout limpa dados privados locais e revoga a sessão no servidor quando
+houver conexão. Nenhuma ação pendente será enviada em nome de uma próxima conta.
+RN-052 — Uma unidade inativa não aceitará novas contratações, reservas ou uso
+operacional do chat. Históricos, atendimento e obrigações financeiras continuarão
+acessíveis aos responsáveis autorizados; a desativação exige plano para reservas
+futuras e comunicação aos afetados.
+RN-053 — O sistema não permitirá desativar a última conta ADM_GERAL habilitada
+sem procedimento de recuperação administrativa previamente provisionado.
+RN-054 — Atividades sensíveis devem registrar auditoria: aprovação, mudança de
+perfil/unidade, intervenção em reserva, baixa manual, estorno, suspensão e votação.
+
+
+08. ESTADOS E TRANSIÇÕES
+
+Os códigos abaixo são valores fechados, validados por CHECK no banco e pela API.
+Transições dependem de permissão e regra de negócio, não apenas do estado anterior.
+
+8.1. Usuário
+PENDENTE -> ATIVO -> BLOQUEADO ou INATIVO.
+BLOQUEADO -> ATIVO mediante liberação autorizada.
+PENDENTE permite somente verificação/recuperação; contas inativas não autenticam.
+Uma conta pode estar ATIVA e ainda não possuir associação habilitada.
+
+8.2. Contrato
+PENDENTE -> VIGENTE após confirmação financeira e validação cadastral.
+PENDENTE -> CANCELADO por desistência ou expiração da proposta.
+VIGENTE -> SUSPENSO por decisão administrativa fundamentada.
+SUSPENSO -> VIGENTE mediante liberação e revalidação.
+VIGENTE ou SUSPENSO -> ENCERRADO ao término; -> CANCELADO conforme política.
+Contratos terminais não são reativados por editar o status: utilizar novo contrato.
+A data de vigência limita o uso mesmo se a rotina de encerramento ainda não rodou.
+Inadimplência é uma condição calculada separada do status contratual.
+
+8.3. Membro do contrato
+PENDENTE -> ATIVO ou REJEITADO.
+ATIVO -> SUSPENSO ou REMOVIDO; SUSPENSO -> ATIVO ou REMOVIDO.
+REJEITADO -> PENDENTE somente com nova solicitação e nova análise.
+O titular é ativado junto com a contratação; os demais dependem de aprovação local.
+REMOVIDO -> PENDENTE somente por nova solicitação, sem apagar decisões anteriores.
+
+8.4. Solicitação de vínculo
+PENDENTE -> APROVADA, REJEITADA ou CANCELADA.
+Cada decisão encerra a solicitação; uma reapresentação cria outro registro.
+
+8.5. Fatura
+ABERTA -> QUITADA por pagamento confirmado válido.
+ABERTA -> CANCELADA por decisão financeira autorizada e justificada.
+QUITADA -> ABERTA se a quitação for integralmente revertida e a dívida permanecer.
+Fatura quitada não é cancelada diretamente sem tratar a reversão correspondente.
+"VENCIDA" é situação de exibição calculada, não status persistido independente.
+
+8.6. Pagamento e estorno
+Pagamento: PENDENTE ou EM_ANALISE -> CONFIRMADO, REJEITADO ou CANCELADO.
+CONFIRMADO permanece como registro histórico; a reversão fica em estornos.
+Estorno: SOLICITADO -> CONFIRMADO ou REJEITADO.
+Na base inicial, apenas reversão integral; o valor é igual ao pagamento original.
+Evento externo fora de ordem deve ser conciliado, sem regressão automática de um
+pagamento já confirmado para pendente ou rejeitado.
+
+8.7. Reserva e ocupação
+Reserva: CONFIRMADA -> CANCELADA ou CONCLUIDA.
+Ocupação: ATIVA -> CANCELADA quando liberada por cancelamento.
+Uma ocupação histórica concluída pode permanecer ATIVA: seu intervalo já passou.
+Cancelar evento cancela suas ocupações na mesma transação.
+
+8.8. Evento e inscrição
+Evento: RASCUNHO -> PUBLICADO -> ENCERRADO; RASCUNHO/PUBLICADO -> CANCELADO.
+Inscrição: CONFIRMADA -> CANCELADA, PRESENTE ou AUSENTE.
+CANCELADA -> CONFIRMADA antes do evento, se houver vaga e nova validação.
+
+8.9. Chamado
+ABERTO -> EM_ATENDIMENTO -> AGUARDANDO_ASSOCIADO -> EM_ATENDIMENTO.
+ABERTO/EM_ATENDIMENTO/AGUARDANDO_ASSOCIADO -> RESOLVIDO -> FECHADO.
+RESOLVIDO ou FECHADO -> ABERTO em reabertura autorizada, registrada no histórico.
+Mensagem particular é parte do chamado e não possui outro ciclo de atendimento.
+
+8.10. Votação
+RASCUNHO -> AGENDADA -> ABERTA -> ENCERRADA.
+RASCUNHO/AGENDADA/ABERTA -> CANCELADA com motivo.
+Não reabrir votação encerrada. Horário do servidor decide se o voto ainda pode
+ser aceito, mesmo que a rotina de encerramento esteja atrasada.
+
+8.11. Chat
+Mensagem: VISIVEL -> OCULTA por moderação justificada.
+Denúncia: ABERTA -> PROCEDENTE ou IMPROCEDENTE.
+Suspensão de envio terá início, fim opcional e eventual revogação.
+
+
+09. PADRÕES DO BANCO MYSQL
+
+9.1. Convenções gerais
+
+- Nome sugerido do banco: vanderclub.
+- Tabelas e colunas: snake_case, sem espaços ou acentos.
+- Todas as tabelas de negócio: ENGINE=InnoDB; DEFAULT CHARSET=utf8mb4.
+- IDs: BIGINT com AUTO_INCREMENT; no C#, usar long. Uma FK terá exatamente o
+  mesmo tipo e sinal da PK referenciada. Tabelas de associação podem usar PK composta.
+- PK = chave primária; FK = chave estrangeira; UQ = restrição UNIQUE.
+- NN = NOT NULL; ? = aceita NULL; AI = AUTO_INCREMENT.
+- Campo sem "?" será obrigatório, salvo indicação explícita diferente.
+- Valores financeiros: DECIMAL(12,2); moeda CHAR(3), inicialmente BRL.
+- CPF: CHAR(11), somente dígitos. Telefone: VARCHAR(20), sem tratamento numérico.
+- CEP: CHAR(8); UF: CHAR(2); número de endereço: VARCHAR(20), pois pode conter
+  letras ou "s/n". Datas de nascimento e vencimento: DATE.
+- Instantes: DATETIME(6), sempre UTC, com sufixo _em. DATETIME não guarda um fuso:
+  a API deverá converter e padronizar explicitamente a conexão do banco.
+- Horários semanais: TIME, sem usar TIMESPAN como tipo MySQL. TimeSpan é tipo C#,
+  não um tipo SQL. Intervalos concretos usam inicio_em e fim_em completos.
+- BOOLEAN será validado como 0 ou 1. Campos de estado/tipo usarão VARCHAR com
+  CHECK de valores permitidos. Não usar texto livre para estados de negócio.
+- E-mail de login: normalizar na API e aplicar UQ ao campo normalizado. Identificadores
+  externos, chaves e hashes exigem comparação sensível a caracteres, por collation
+  binária adequada ou armazenamento binário, sem equivalência por acentos/caixa.
+- Ausência de informação será NULL, não string vazia, zero fictício ou data inventada.
+
+9.2. Campos comuns, obrigatórios conforme a marca da tabela
+
+Tabelas marcadas [M] incluem, além dos campos listados:
+  criado_em DATETIME(6) NN;
+  atualizado_em DATETIME(6) NN;
+  versao BIGINT NN DEFAULT 1.
+
+Tabelas marcadas [H] incluem:
+  criado_em DATETIME(6) NN.
+
+[M] significa registro mutável, com controle otimista de edição. A API incrementa
+versao a cada alteração e rejeita uma atualização baseada em versão antiga.
+[H] significa registro de histórico/associação que não sofre edição comum.
+As permissões de escrita e rotinas de retenção continuam necessárias; a marca não
+é um recurso automático do MySQL.
+
+9.3. Exclusões e referências
+
+Regra padrão de todas as FKs abaixo: ON DELETE RESTRICT e ON UPDATE RESTRICT,
+inclusive FKs opcionais. IDs serão imutáveis. Desativação de negócio usará estado,
+não DELETE. Não usar cascata para apagar contratos, faturas, pagamentos, votos,
+aprovações ou auditoria. Eventual eliminação/anonimização deverá seguir uma rotina
+específica e a política de retenção, sem remover evidências necessárias por acidente.
+
+Todos os campos FK devem ter índice apropriado; índices compostos podem atender
+mais de uma consulta. CHECK verifica regras da própria linha. Regras envolvendo
+outras tabelas, permissões e contagem de registros serão aplicadas nos serviços
+transacionais, não por CHECK com subconsulta. [T1, T3]
+
+9.4. Alcance do modelo
+
+As 43 tabelas abaixo cobrem o escopo proposto e os principais registros de suporte.
+Não é necessário construir todas as telas de uma vez. A implementação poderá
+acrescentar tabelas técnicas exigidas pela biblioteca de autenticação ou migração,
+sem mudar os conceitos e as relações de negócio aqui definidos.
+
+
+10. DICIONÁRIO DE DADOS
+
+10.01. estados [M]
+Finalidade: unidades federativas brasileiras.
+  id BIGINT PK AI;
+  nome VARCHAR(100) NN;
+  uf CHAR(2) NN UQ.
+
+10.02. cidades [M]
+Finalidade: cidades vinculadas a seus estados.
+  id BIGINT PK AI;
+  estado_id BIGINT NN FK -> estados.id;
+  nome VARCHAR(150) NN;
+  codigo_ibge CHAR(7) ? UQ.
+  UQ(estado_id, nome).
+O campo nome representa a cidade, corrigindo a descrição do TXT original.
+
+10.03. clubes [M]
+Finalidade: unidades operacionais da rede.
+  id BIGINT PK AI;
+  nome VARCHAR(150) NN;
+  sigla VARCHAR(20) NN UQ;
+  descricao TEXT ?;
+  cidade_id BIGINT NN FK -> cidades.id;
+  logradouro VARCHAR(200) NN;
+  numero VARCHAR(20) NN;
+  complemento VARCHAR(100) ?;
+  bairro VARCHAR(100) NN;
+  cep CHAR(8) NN;
+  telefone VARCHAR(20) NN;
+  email VARCHAR(254) NN;
+  fuso_horario VARCHAR(64) NN, exemplo: America/Sao_Paulo;
+  status VARCHAR(10) NN, ATIVO ou INATIVO.
+O fuso deve ser reconhecido pela aplicação, não um deslocamento fixo presumido.
+
+10.04. pessoas [M]
+Finalidade: identidade e cadastro de titulares, beneficiários e administradores.
+  id BIGINT PK AI;
+  nome VARCHAR(200) NN;
+  cpf CHAR(11) ? UQ;
+  data_nascimento DATE ?;
+  telefone VARCHAR(20) ?;
+  email_contato VARCHAR(254) ?;
+  cidade_id BIGINT ? FK -> cidades.id;
+  logradouro VARCHAR(200) ?;
+  numero VARCHAR(20) ?;
+  complemento VARCHAR(100) ?;
+  bairro VARCHAR(100) ?;
+  cep CHAR(8) ?;
+  sexo VARCHAR(30) ?;
+  estado_civil VARCHAR(30) ?;
+  inativado_em DATETIME(6) ?.
+CPF, nascimento e endereço completos serão exigidos pela API na contratação do
+titular, embora possam ser incompletos na etapa de cadastro inicial. Sexo, estado
+civil e interesses serão opcionais, sem condicionar o acesso ao plano.
+
+10.05. usuarios [M]
+Finalidade: conta de autenticação. Não duplicar nome, CPF e endereço aqui.
+  id BIGINT PK AI;
+  pessoa_id BIGINT NN UQ FK -> pessoas.id;
+  email_login VARCHAR(254) NN;
+  email_normalizado VARCHAR(254) NN UQ;
+  senha_hash VARCHAR(512) NN;
+  perfil VARCHAR(20) NN, ASSOCIADO, ADM_LOCAL ou ADM_GERAL;
+  status VARCHAR(15) NN, PENDENTE, ATIVO, BLOQUEADO ou INATIVO;
+  email_verificado_em DATETIME(6) ?;
+  deve_trocar_senha BOOLEAN NN DEFAULT 0;
+  falhas_login INT NN DEFAULT 0;
+  bloqueado_ate_em DATETIME(6) ?;
+  security_stamp CHAR(36) NN;
+  ultimo_login_em DATETIME(6) ?.
+email_contato e email_login têm finalidades distintas; mudar contato não altera
+automaticamente a credencial. Não retornar senha_hash ou security_stamp em DTOs.
+
+10.06. administradores_clubes [M]
+Finalidade: unidade de atuação do ADM_LOCAL.
+  usuario_id BIGINT PK FK -> usuarios.id;
+  clube_id BIGINT NN FK -> clubes.id;
+  atribuido_por_usuario_id BIGINT NN FK -> usuarios.id;
+  ativo BOOLEAN NN DEFAULT 1.
+A PK em usuario_id limita o administrador a uma unidade por vez. clube_id não é
+UNIQUE, permitindo mais de um administrador na unidade. A API exige perfil
+ADM_LOCAL e registra transferências em auditoria. ADM_GERAL não precisa desta linha.
+
+10.07. sessoes [M]
+Finalidade: renovação e revogação de sessões.
+  id BIGINT PK AI;
+  usuario_id BIGINT NN FK -> usuarios.id;
+  familia CHAR(36) NN;
+  refresh_token_hash CHAR(64) NN UQ;
+  plataforma VARCHAR(30) NN;
+  dispositivo_descricao VARCHAR(150) ?;
+  expira_em DATETIME(6) NN;
+  revogado_em DATETIME(6) ?;
+  substituido_por_id BIGINT ? FK -> sessoes.id;
+  ultimo_uso_em DATETIME(6) ?.
+Cada rotação cria outra linha na mesma familia e revoga a anterior. Guardar apenas
+o hash de token aleatório de alta entropia. Reutilização de token revogado pode
+invalidar toda a família. Uma sessão de dispositivo pode compreender várias linhas.
+
+10.08. tokens_usuario [M]
+Finalidade: verificação de e-mail, recuperação e ativação por convite.
+  id BIGINT PK AI;
+  usuario_id BIGINT NN FK -> usuarios.id;
+  finalidade VARCHAR(25) NN, VERIFICAR_EMAIL, RECUPERAR_SENHA ou ATIVAR_CONTA;
+  token_hash CHAR(64) NN UQ;
+  email_destino VARCHAR(254) NN;
+  expira_em DATETIME(6) NN;
+  utilizado_em DATETIME(6) ?;
+  revogado_em DATETIME(6) ?.
+Uso único e consumo atômico; nunca enviar o hash como se fosse o token original.
+
+10.09. interesses [M]
+Finalidade: catálogo opcional de interesses, como pesca, esportes e gastronomia.
+  id BIGINT PK AI;
+  nome VARCHAR(100) NN UQ;
+  ativo BOOLEAN NN DEFAULT 1.
+
+10.10. pessoas_interesses [H]
+Finalidade: relação muitos-para-muitos entre pessoas e interesses.
+  pessoa_id BIGINT NN FK -> pessoas.id;
+  interesse_id BIGINT NN FK -> interesses.id;
+  PK(pessoa_id, interesse_id).
+Não guardar uma lista separada por vírgulas no cadastro da pessoa.
+
+10.11. planos [M]
+Finalidade: identidade comercial permanente do plano.
+  id BIGINT PK AI;
+  codigo VARCHAR(40) NN UQ;
+  nome VARCHAR(150) NN;
+  descricao TEXT NN;
+  ativo BOOLEAN NN DEFAULT 1.
+Preço e limites ficam na versão e nas condições, não em um único campo VALOR.
+
+10.12. plano_versoes [M]
+Finalidade: condições associativas publicadas e preservadas para os contratos.
+  id BIGINT PK AI;
+  plano_id BIGINT NN FK -> planos.id;
+  numero_versao INT NN;
+  abrangencia VARCHAR(10) NN, LOCAL ou REDE;
+  duracao_meses SMALLINT NN;
+  limite_dependentes SMALLINT NN;
+  limite_convidados SMALLINT NN;
+  tolerancia_atraso_dias SMALLINT NN DEFAULT 0;
+  limite_reservas_futuras SMALLINT NN;
+  beneficios TEXT NN;
+  regras_contratacao TEXT NN;
+  documento_termos_id BIGINT NN FK -> documentos.id;
+  status VARCHAR(15) NN, RASCUNHO, PUBLICADA ou DESATIVADA;
+  publicada_em DATETIME(6) ?;
+  UQ(plano_id, numero_versao).
+CHECK: duração e versão > 0; limites e tolerância >= 0. Zero reservas futuras
+significa que o plano não permite reservar, não "ilimitado". Publicar congela o
+conteúdo; depois só é permitido desativar a oferta. A API valida as unidades locais.
+
+10.13. plano_versao_clubes [H]
+Finalidade: unidades em que a versão LOCAL pode ser contratada.
+  plano_versao_id BIGINT NN FK -> plano_versoes.id;
+  clube_id BIGINT NN FK -> clubes.id;
+  PK(plano_versao_id, clube_id).
+LOCAL exige ao menos uma linha antes da publicação. REDE não utiliza esta lista:
+a cobertura decorre da regra de todas as unidades ativas. Uma linha não significa
+que o titular local terá acesso a todas as unidades listadas, apenas que pode
+escolher uma delas ao contratar.
+
+10.14. condicoes_pagamento [M]
+Finalidade: alternativas comerciais de pagamento de uma versão do plano.
+  id BIGINT PK AI;
+  plano_versao_id BIGINT NN FK -> plano_versoes.id;
+  nome VARCHAR(100) NN;
+  forma VARCHAR(20) NN, PIX, BOLETO, CARTAO ou TRANSFERENCIA;
+  valor_total DECIMAL(12,2) NN;
+  quantidade_parcelas SMALLINT NN;
+  intervalo_meses SMALLINT NN;
+  ativa BOOLEAN NN DEFAULT 1;
+  UQ(plano_versao_id, nome);
+  UQ(id, plano_versao_id), para referência composta do contrato.
+CHECK: valor_total > 0, quantidade_parcelas > 0; parcela única exige intervalo 0;
+mais de uma parcela exige intervalo > 0. Valores congelados após publicação.
+Na base inicial, CARTAO representa cobrança à vista de uma fatura, sem implementar
+parcelamento da compra pela operadora. Se a condição for CARTAO, a oferta inicial
+terá quantidade_parcelas = 1; o parcelamento anual previsto usa boletos separados.
+Uma opção no catálogo só pode ser vendida se o fluxo de cobrança correspondente
+estiver operacional. Dinheiro poderá ser usado na baixa manual autorizada, sem
+ser apresentado como pagamento online.
+
+10.15. contratos [M]
+Finalidade: adesão do titular a uma oferta em um período definido.
+  id BIGINT PK AI;
+  numero VARCHAR(30) NN UQ;
+  titular_pessoa_id BIGINT NN FK -> pessoas.id;
+  clube_origem_id BIGINT NN FK -> clubes.id;
+  plano_versao_id BIGINT NN FK -> plano_versoes.id;
+  condicao_pagamento_id BIGINT NN;
+  contrato_anterior_id BIGINT ? FK -> contratos.id;
+  inicio_em DATETIME(6) NN;
+  fim_em DATETIME(6) NN;
+  proposta_expira_em DATETIME(6) NN;
+  valor_total_contratado DECIMAL(12,2) NN;
+  quantidade_parcelas SMALLINT NN;
+  dia_vencimento TINYINT NN;
+  moeda CHAR(3) NN DEFAULT 'BRL';
+  status VARCHAR(15) NN, PENDENTE, VIGENTE, SUSPENSO, CANCELADO ou ENCERRADO;
+  ativado_em DATETIME(6) ?;
+  cancelado_em DATETIME(6) ?;
+  motivo_status VARCHAR(500) ?;
+  UQ(id, titular_pessoa_id);
+  FK(condicao_pagamento_id, plano_versao_id)
+    -> condicoes_pagamento(id, plano_versao_id).
+CHECK: fim_em > inicio_em; valor_total_contratado > 0; parcelas > 0;
+dia_vencimento entre 1 e 31. Renovação não pode apontar para si mesma ou formar
+ciclo; a API verificará titular e sequência temporal. Apenas uma renovação efetiva
+poderá suceder o mesmo contrato; propostas canceladas continuam no histórico e
+não impedem uma nova tentativa. Os campos financeiros são
+o retrato da contratação, não um preço recalculado pelo catálogo atual.
+
+10.16. membros_contrato [M]
+Finalidade: pessoas beneficiárias e seu tipo na associação.
+  id BIGINT PK AI;
+  contrato_id BIGINT NN FK -> contratos.id;
+  pessoa_id BIGINT NN FK -> pessoas.id;
+  tipo VARCHAR(15) NN, TITULAR, DEPENDENTE ou CONVIDADO;
+  parentesco VARCHAR(50) ?;
+  responsavel_pessoa_id BIGINT ? FK -> pessoas.id;
+  status VARCHAR(15) NN, PENDENTE, ATIVO, REJEITADO, SUSPENSO ou REMOVIDO;
+  aprovado_em DATETIME(6) ?;
+  aprovado_por_usuario_id BIGINT ? FK -> usuarios.id;
+  removido_em DATETIME(6) ?;
+  motivo_status VARCHAR(500) ?;
+  UQ(contrato_id, pessoa_id).
+Reinclusão usa a mesma linha, com nova solicitação e histórico; não cria duplicata.
+O titular financeiro não é automaticamente o responsável legal de um menor.
+Validar responsabilidade quando aplicável. A API garante exatamente um TITULAR,
+coincidente com contratos.titular_pessoa_id, e controla a exclusividade temporal.
+Proteção adicional: coluna gerada armazenada (STORED) contrato_titular_id BIGINT,
+igual a contrato_id quando tipo for TITULAR, caso contrário NULL, com
+UQ(contrato_titular_id), limitando a um titular.
+
+10.17. solicitacoes_vinculo [M]
+Finalidade: fila e histórico de análises de inclusão, correção e remoção.
+  id BIGINT PK AI;
+  protocolo VARCHAR(30) NN UQ;
+  membro_contrato_id BIGINT NN FK -> membros_contrato.id;
+  solicitante_usuario_id BIGINT NN FK -> usuarios.id;
+  tipo VARCHAR(15) NN, INCLUSAO, ALTERACAO ou REMOCAO;
+  dados_propostos JSON ?;
+  documento_arquivo_id BIGINT ? FK -> arquivos.id;
+  status VARCHAR(15) NN, PENDENTE, APROVADA, REJEITADA ou CANCELADA;
+  analisado_por_usuario_id BIGINT ? FK -> usuarios.id;
+  analisado_em DATETIME(6) ?;
+  justificativa VARCHAR(1000) ?.
+Uma pendência por membro/operação de alteração por vez, controlada em transação.
+JSON contém apenas os campos propostos, conforme DTO autorizado; não substitui
+as FKs. Rejeição exige justificativa. Documento opcional pode ser um PDF de várias
+páginas; múltiplos anexos por solicitação são uma evolução possível.
+
+10.18. faturas [M]
+Finalidade: obrigação financeira de cada parcela do contrato.
+  id BIGINT PK AI;
+  contrato_id BIGINT NN FK -> contratos.id;
+  numero VARCHAR(30) NN UQ;
+  numero_parcela SMALLINT NN;
+  descricao VARCHAR(250) NN;
+  vencimento DATE NN;
+  valor DECIMAL(12,2) NN;
+  status VARCHAR(10) NN, ABERTA, QUITADA ou CANCELADA;
+  quitada_em DATETIME(6) ?;
+  cancelada_em DATETIME(6) ?;
+  cancelada_por_usuario_id BIGINT ? FK -> usuarios.id;
+  motivo_cancelamento VARCHAR(500) ?;
+  UQ(contrato_id, numero_parcela).
+CHECK: valor > 0 e numero_parcela > 0. Situação vencida é calculada. Cada fatura
+herda moeda e contexto financeiro do contrato. Não repetir unidade ou titular
+sem necessidade; obtê-los pelo contrato.
+
+10.19. pagamentos [M]
+Finalidade: tentativas e recebimentos, inclusive divergências do provedor.
+  id BIGINT PK AI;
+  fatura_id BIGINT NN FK -> faturas.id;
+  origem VARCHAR(10) NN, MANUAL ou PROVEDOR;
+  forma VARCHAR(20) NN, PIX, BOLETO, CARTAO, TRANSFERENCIA, DINHEIRO ou OUTRO;
+  valor DECIMAL(12,2) NN;
+  moeda CHAR(3) NN DEFAULT 'BRL';
+  status VARCHAR(15) NN, PENDENTE, EM_ANALISE, CONFIRMADO, REJEITADO ou CANCELADO;
+  quitacao_aplicada BOOLEAN NN DEFAULT 0;
+  conciliacao VARCHAR(15) NN, PENDENTE, REGULAR ou DIVERGENTE;
+  provedor VARCHAR(60) ?;
+  referencia_externa VARCHAR(150) ?;
+  referencia_manual VARCHAR(150) ?;
+  checkout_url TEXT ?;
+  linha_digitavel VARCHAR(100) ?;
+  pix_copia_cola TEXT ?;
+  expira_em DATETIME(6) ?;
+  comprovante_arquivo_id BIGINT ? FK -> arquivos.id;
+  registrado_por_usuario_id BIGINT ? FK -> usuarios.id;
+  confirmado_por_usuario_id BIGINT ? FK -> usuarios.id;
+  pago_em DATETIME(6) ?;
+  confirmado_em DATETIME(6) ?;
+  justificativa VARCHAR(1000) ?;
+  UQ(provedor, referencia_externa).
+CHECK: valor > 0; quitacao_aplicada = 1 exige status CONFIRMADO. A API exige
+confirmado_por_usuario_id para baixa manual e valida valor/moeda antes da aplicação.
+Adicionar coluna gerada armazenada (STORED) fatura_quitada_id BIGINT, com expressão:
+  CASE WHEN quitacao_aplicada = 1 THEN fatura_id ELSE NULL END
+e UQ(fatura_quitada_id). Assim só existe uma quitação aplicada por fatura.
+Um recebimento externo excedente pode estar CONFIRMADO, mas com aplicação falsa
+e conciliação DIVERGENTE. Não é descartado nem quita outra obrigação automaticamente.
+Não armazenar número de cartão, CVV ou credenciais bancárias nestas colunas.
+
+10.20. estornos [M]
+Finalidade: reversão integral de um pagamento, sem apagá-lo.
+  id BIGINT PK AI;
+  pagamento_id BIGINT NN FK -> pagamentos.id;
+  valor DECIMAL(12,2) NN;
+  origem VARCHAR(10) NN, MANUAL ou PROVEDOR;
+  provedor VARCHAR(60) ?;
+  referencia_externa VARCHAR(150) ?;
+  status VARCHAR(15) NN, SOLICITADO, CONFIRMADO ou REJEITADO;
+  motivo VARCHAR(1000) NN;
+  solicitado_por_usuario_id BIGINT ? FK -> usuarios.id;
+  confirmado_por_usuario_id BIGINT ? FK -> usuarios.id;
+  efetivado_em DATETIME(6) ?;
+  UQ(provedor, referencia_externa).
+CHECK: valor > 0. A API exige valor igual ao original e no máximo uma reversão
+integral confirmada por pagamento. Adicionar coluna gerada armazenada (STORED)
+pagamento_estornado_id BIGINT,
+igual a pagamento_id somente em status CONFIRMADO, com UQ, para reforçar esse limite.
+Confirmar estorno remove a quitação aplicada do pagamento na mesma transação e
+ajusta a fatura conforme a decisão de manter ou cancelar a obrigação. Estornar
+recebimento excedente não reabre fatura quitada por outro pagamento válido.
+
+10.21. eventos_provedor [M]
+Finalidade: entrada durável e deduplicação das notificações financeiras.
+  id BIGINT PK AI;
+  provedor VARCHAR(60) NN;
+  evento_externo_id VARCHAR(150) NN;
+  tipo VARCHAR(100) NN;
+  pagamento_id BIGINT ? FK -> pagamentos.id;
+  hash_conteudo CHAR(64) NN;
+  dados_minimos JSON NN;
+  status VARCHAR(15) NN, RECEBIDO, PROCESSADO, DIVERGENTE ou ERRO;
+  tentativas INT NN DEFAULT 0;
+  processado_em DATETIME(6) ?;
+  proxima_tentativa_em DATETIME(6) ?;
+  erro_resumido VARCHAR(500) ?;
+  UQ(provedor, evento_externo_id).
+Receber somente após validar a origem. Associar a pagamento quando reconhecido;
+caso desconhecido permanece rastreável para conciliação. Não guardar payloads
+indiscriminadamente nem incluir dados sensíveis em erro_resumido.
+
+10.22. areas [M]
+Finalidade: espaços reserváveis ou ocupáveis de uma unidade.
+  id BIGINT PK AI;
+  clube_id BIGINT NN FK -> clubes.id;
+  nome VARCHAR(150) NN;
+  descricao TEXT NN;
+  capacidade INT NN;
+  antecedencia_minima_horas INT NN;
+  antecedencia_maxima_dias INT NN;
+  duracao_maxima_minutos INT NN;
+  intervalo_apos_uso_minutos INT NN DEFAULT 0;
+  cancelamento_minimo_horas INT NN;
+  regras_uso TEXT NN;
+  ativo BOOLEAN NN DEFAULT 1;
+  UQ(clube_id, nome).
+CHECK: capacidade e duração > 0; demais limites >= 0. A API valida a compatibilidade
+entre antecedência mínima, máxima e agenda antes de disponibilizar a área.
+
+10.23. horarios_area [M]
+Finalidade: janelas semanais de funcionamento de cada área, em horário local.
+  id BIGINT PK AI;
+  area_id BIGINT NN FK -> areas.id;
+  dia_semana TINYINT NN, 0=domingo até 6=sábado;
+  hora_inicio TIME NN;
+  hora_fim TIME NN;
+  UQ(area_id, dia_semana, hora_inicio, hora_fim).
+CHECK: dia_semana entre 0 e 6; 00:00:00 <= hora_inicio < hora_fim <= 24:00:00.
+Janelas não se sobrepõem para a mesma área/dia. Uso que atravessa meia-noite será
+dividido em janelas de dias consecutivos. Feriados e exceções usam bloqueios na agenda.
+
+10.24. eventos [M]
+Finalidade: programação social de cada unidade.
+  id BIGINT PK AI;
+  clube_id BIGINT NN FK -> clubes.id;
+  criado_por_usuario_id BIGINT NN FK -> usuarios.id;
+  titulo VARCHAR(200) NN;
+  descricao TEXT NN;
+  inicio_em DATETIME(6) NN;
+  fim_em DATETIME(6) NN;
+  publico VARCHAR(15) NN, ASSOCIADOS ou PUBLICO;
+  capacidade INT NN;
+  local_descricao VARCHAR(250) NN;
+  inscricoes_abrem_em DATETIME(6) NN;
+  inscricoes_encerram_em DATETIME(6) NN;
+  status VARCHAR(15) NN, RASCUNHO, PUBLICADO, ENCERRADO ou CANCELADO;
+  motivo_cancelamento VARCHAR(500) ?.
+CHECK: fim_em > inicio_em; capacidade > 0; abertura de inscrições <= encerramento
+das inscrições <= inicio_em. Eventos que utilizem áreas cadastradas exigem ocupações
+correspondentes; eventos externos podem usar somente local_descricao.
+
+10.25. inscricoes_evento [M]
+Finalidade: participação individual em evento.
+  id BIGINT PK AI;
+  evento_id BIGINT NN FK -> eventos.id;
+  pessoa_id BIGINT NN FK -> pessoas.id;
+  registrado_por_usuario_id BIGINT NN FK -> usuarios.id;
+  status VARCHAR(15) NN, CONFIRMADA, CANCELADA, PRESENTE ou AUSENTE;
+  cancelada_em DATETIME(6) ?;
+  presenca_registrada_em DATETIME(6) ?;
+  UQ(evento_id, pessoa_id).
+Público externo pode ter apenas registro mínimo em pessoas, sem usuário ou contrato.
+O cadastro externo será feito pela administração na primeira versão. Não pedir
+dados de associado completos quando não forem necessários à inscrição pública.
+
+10.26. reservas [M]
+Finalidade: solicitação confirmada de uso de área por um titular.
+  id BIGINT PK AI;
+  protocolo VARCHAR(30) NN UQ;
+  membro_contrato_id BIGINT NN FK -> membros_contrato.id;
+  criado_por_usuario_id BIGINT NN FK -> usuarios.id;
+  finalidade VARCHAR(250) NN;
+  quantidade_pessoas INT NN;
+  regras_aceitas TEXT NN;
+  cancelamento_minimo_horas INT NN;
+  status VARCHAR(15) NN, CONFIRMADA, CANCELADA ou CONCLUIDA;
+  cancelado_em DATETIME(6) ?;
+  cancelado_por_usuario_id BIGINT ? FK -> usuarios.id;
+  motivo_cancelamento VARCHAR(500) ?.
+CHECK: quantidade_pessoas > 0 e prazo de cancelamento >= 0.
+Área e datas ficam em ocupacoes_area. Cada reserva terá exatamente uma ocupação;
+reserva e ocupação serão criadas e canceladas na mesma transação. Evita duplicar
+o nome da área, clube_id e datas em fontes distintas que podem divergir.
+
+10.27. ocupacoes_area [M]
+Finalidade: agenda única de reservas, eventos e manutenção.
+  id BIGINT PK AI;
+  area_id BIGINT NN FK -> areas.id;
+  tipo VARCHAR(10) NN, RESERVA, EVENTO ou BLOQUEIO;
+  reserva_id BIGINT ? UQ FK -> reservas.id;
+  evento_id BIGINT ? FK -> eventos.id;
+  inicio_em DATETIME(6) NN;
+  fim_em DATETIME(6) NN;
+  intervalo_apos_uso_minutos INT NN DEFAULT 0;
+  status VARCHAR(10) NN, ATIVA ou CANCELADA;
+  criado_por_usuario_id BIGINT NN FK -> usuarios.id;
+  motivo VARCHAR(500) ?.
+CHECK: fim_em > inicio_em; intervalo >= 0; e exatamente a combinação correta:
+RESERVA exige reserva_id e evento_id NULL; EVENTO exige evento_id e reserva_id NULL;
+BLOQUEIO exige os dois NULL e motivo informado.
+Um evento pode ocupar várias áreas. A API valida que todas pertencem à unidade
+do evento e que os intervalos abrangem o uso, incluindo montagem/desmontagem.
+O intervalo após uso é um retrato da regra da área no momento da criação. A
+verificação de conflito considera fim_em acrescido desse intervalo para cada
+ocupação, inclusive a nova, sem alterar o horário exibido da reserva.
+
+10.28. chamados [M]
+Finalidade: solicitações, reclamações, elogios e atendimento particular.
+  id BIGINT PK AI;
+  protocolo VARCHAR(30) NN UQ;
+  clube_id BIGINT NN FK -> clubes.id;
+  autor_usuario_id BIGINT NN FK -> usuarios.id;
+  contrato_id BIGINT ? FK -> contratos.id;
+  tipo VARCHAR(20) NN, SOLICITACAO, RECLAMACAO, ELOGIO ou ATENDIMENTO;
+  assunto VARCHAR(200) NN;
+  prioridade VARCHAR(10) NN, NORMAL ou ALTA;
+  status VARCHAR(25) NN, ABERTO, EM_ATENDIMENTO, AGUARDANDO_ASSOCIADO,
+    RESOLVIDO ou FECHADO;
+  responsavel_usuario_id BIGINT ? FK -> usuarios.id;
+  resolvido_em DATETIME(6) ?;
+  fechado_em DATETIME(6) ?;
+  solucao TEXT ?.
+A mensagem inicial fica em mensagens_chamado. Autor sem contrato pode abrir
+ATENDIMENTO sobre adesão; outros tipos exigem vínculo conforme a política.
+Chamado sobre contrato deve estar associado ao titular/beneficiário autorizado.
+
+10.29. mensagens_chamado [H]
+Finalidade: conversa privada do protocolo, inclusive anexos.
+  id BIGINT PK AI;
+  chamado_id BIGINT NN FK -> chamados.id;
+  autor_usuario_id BIGINT NN FK -> usuarios.id;
+  texto TEXT NN;
+  arquivo_id BIGINT ? FK -> arquivos.id;
+  id_cliente CHAR(36) NN;
+  UQ(autor_usuario_id, id_cliente).
+Texto obrigatório e limitado pela API; não suportar notas internas ocultas na
+primeira versão para evitar que sejam expostas por engano ao associado.
+
+10.30. mensagens_chat [M]
+Finalidade: histórico do chat geral de cada unidade.
+  id BIGINT PK AI;
+  clube_id BIGINT NN FK -> clubes.id;
+  autor_usuario_id BIGINT NN FK -> usuarios.id;
+  texto VARCHAR(4000) NN;
+  id_cliente CHAR(36) NN;
+  status VARCHAR(10) NN, VISIVEL ou OCULTA;
+  moderado_por_usuario_id BIGINT ? FK -> usuarios.id;
+  moderado_em DATETIME(6) ?;
+  motivo_moderacao VARCHAR(500) ?;
+  UQ(autor_usuario_id, id_cliente).
+Não editar texto enviado na base inicial. Ocultação altera visibilidade, preservando
+o original sob acesso restrito. Ordenação e cursor usarão id, não o relógio do celular.
+
+10.31. leituras_chat [M]
+Finalidade: progresso individual de leitura por unidade.
+  clube_id BIGINT NN FK -> clubes.id;
+  usuario_id BIGINT NN FK -> usuarios.id;
+  ultima_mensagem_id BIGINT ? FK -> mensagens_chat.id;
+  lido_em DATETIME(6) ?;
+  PK(clube_id, usuario_id).
+A API garante que a mensagem pertence ao mesmo clube e que o marcador só avança.
+Não usar essa tabela para conferir permissão de participação no chat.
+
+10.32. moderacoes_chat [M]
+Finalidade: suspensão temporária de envio de mensagens.
+  id BIGINT PK AI;
+  clube_id BIGINT NN FK -> clubes.id;
+  usuario_id BIGINT NN FK -> usuarios.id;
+  aplicado_por_usuario_id BIGINT NN FK -> usuarios.id;
+  motivo VARCHAR(1000) NN;
+  inicio_em DATETIME(6) NN;
+  fim_em DATETIME(6) ?;
+  revogado_em DATETIME(6) ?;
+  revogado_por_usuario_id BIGINT ? FK -> usuarios.id.
+CHECK: fim_em NULL ou maior que inicio_em. Suspensão de chat não bloqueia o canal
+particular de atendimento nem o acesso às próprias cobranças.
+
+10.33. denuncias_chat [M]
+Finalidade: encaminhar conteúdo à moderação da unidade.
+  id BIGINT PK AI;
+  mensagem_id BIGINT NN FK -> mensagens_chat.id;
+  denunciante_usuario_id BIGINT NN FK -> usuarios.id;
+  motivo VARCHAR(1000) NN;
+  status VARCHAR(15) NN, ABERTA, PROCEDENTE ou IMPROCEDENTE;
+  analisado_por_usuario_id BIGINT ? FK -> usuarios.id;
+  analisado_em DATETIME(6) ?;
+  resposta VARCHAR(1000) ?;
+  UQ(mensagem_id, denunciante_usuario_id).
+A identidade do denunciante não será divulgada no chat geral.
+
+10.34. votacoes [M]
+Finalidade: consultas e deliberações da unidade.
+  id BIGINT PK AI;
+  clube_id BIGINT NN FK -> clubes.id;
+  criado_por_usuario_id BIGINT NN FK -> usuarios.id;
+  titulo VARCHAR(200) NN;
+  descricao TEXT NN;
+  regras TEXT NN;
+  inicio_em DATETIME(6) NN;
+  fim_em DATETIME(6) NN;
+  exigir_adimplencia BOOLEAN NN DEFAULT 0;
+  quorum_percentual DECIMAL(5,2) NN DEFAULT 0;
+  status VARCHAR(15) NN, RASCUNHO, AGENDADA, ABERTA, ENCERRADA ou CANCELADA;
+  publicada_em DATETIME(6) ?;
+  eleitorado_gerado_em DATETIME(6) ?;
+  encerrada_em DATETIME(6) ?;
+  motivo_cancelamento VARCHAR(500) ?.
+CHECK: fim_em > inicio_em e quórum entre 0 e 100. Zero significa sem quórum mínimo.
+O modelo inicial é de escolha única. Regras estatutárias adicionais precisam ser
+definidas antes de usar a aplicação para eleições institucionais formais.
+
+10.35. opcoes_votacao [H]
+Finalidade: alternativas de escolha da votação.
+  id BIGINT PK AI;
+  votacao_id BIGINT NN FK -> votacoes.id;
+  texto VARCHAR(250) NN;
+  ordem SMALLINT NN;
+  em_branco BOOLEAN NN DEFAULT 0;
+  UQ(votacao_id, ordem);
+  UQ(votacao_id, id).
+Permitir manutenção apenas enquanto RASCUNHO. Exigir duas opções não brancas
+antes da publicação. Se permitido, o voto em branco terá uma opção explícita;
+a API garantirá no máximo uma opção em_branco por votação.
+
+10.36. eleitores_votacao [H]
+Finalidade: fotografia do eleitorado na abertura.
+  id BIGINT PK AI;
+  votacao_id BIGINT NN FK -> votacoes.id;
+  pessoa_id BIGINT NN FK -> pessoas.id;
+  membro_contrato_id BIGINT NN FK -> membros_contrato.id;
+  UQ(votacao_id, pessoa_id);
+  UQ(votacao_id, id).
+O membro referenciado comprova a elegibilidade na abertura. A API também confirma
+que a pessoa é a mesma e mantém a elegibilidade no momento do voto, admitindo
+renovação sem mudar sua identidade. Não recalcular silenciosamente o eleitorado
+para alterar o denominador de quórum depois de abrir a votação.
+
+10.37. votos [H]
+Finalidade: escolha confirmada de cada eleitor.
+  id BIGINT PK AI;
+  votacao_id BIGINT NN FK -> votacoes.id;
+  eleitor_id BIGINT NN UQ;
+  opcao_id BIGINT NN;
+  comprovante CHAR(36) NN UQ;
+  FK(votacao_id, eleitor_id) -> eleitores_votacao(votacao_id, id);
+  FK(votacao_id, opcao_id) -> opcoes_votacao(votacao_id, id).
+As FKs compostas impedem usar eleitor ou opção de outra votação. UQ(eleitor_id)
+impede voto duplicado. Não guardar votos em JSON, texto concatenado ou só em um
+contador da opção. O comprovante apenas confirma registro, sem servir de credencial.
+Este vínculo permite identificar a escolha no banco: não constitui voto secreto.
+
+10.38. notificacoes [M]
+Finalidade: avisos internos persistentes e leitura por destinatário.
+  id BIGINT PK AI;
+  usuario_id BIGINT NN FK -> usuarios.id;
+  clube_id BIGINT ? FK -> clubes.id;
+  categoria VARCHAR(30) NN;
+  titulo VARCHAR(200) NN;
+  mensagem VARCHAR(1000) NN;
+  rota_interna VARCHAR(300) ?;
+  chave_evento VARCHAR(150) NN;
+  lida_em DATETIME(6) ?;
+  UQ(usuario_id, chave_evento).
+rota_interna é navegação, não FK ou autorização. Abrir o destino exige nova
+verificação da API. Não incluir detalhes privados em notificações exibidas na tela
+bloqueada. A chave evita avisos duplicados por repetição da mesma operação.
+
+10.39. arquivos [M]
+Finalidade: metadados de arquivos privados, sem armazenar URLs públicas permanentes.
+  id BIGINT PK AI;
+  enviado_por_usuario_id BIGINT NN FK -> usuarios.id;
+  chave_armazenamento VARCHAR(300) NN UQ;
+  nome_original VARCHAR(255) NN;
+  mime_type VARCHAR(100) NN;
+  tamanho_bytes BIGINT NN;
+  sha256 CHAR(64) NN;
+  status VARCHAR(15) NN, PENDENTE, DISPONIVEL, REJEITADO ou REMOVIDO;
+  removido_em DATETIME(6) ?.
+CHECK: tamanho_bytes > 0. Conteúdo fica em armazenamento privado; referências
+relacionais ficam nas tabelas de origem. O download valida vínculo e permissão,
+não apenas quem enviou. Anexos órfãos temporários serão removidos após prazo definido.
+
+10.40. documentos [M]
+Finalidade: versões de termos, aviso de privacidade e regulamentos.
+  id BIGINT PK AI;
+  tipo VARCHAR(30) NN, TERMOS_ASSOCIACAO, PRIVACIDADE ou REGULAMENTO;
+  codigo_versao VARCHAR(30) NN;
+  titulo VARCHAR(200) NN;
+  conteudo LONGTEXT NN;
+  hash_conteudo CHAR(64) NN;
+  publicado_em DATETIME(6) ?;
+  ativo BOOLEAN NN DEFAULT 1;
+  UQ(tipo, codigo_versao).
+Depois de publicado ou referenciado em aceite, o conteúdo não será editado.
+Uma mudança exige novo documento/versão.
+
+10.41. aceites_documentos [H]
+Finalidade: comprovar qual versão foi apresentada e aceita ou conhecida.
+  id BIGINT PK AI;
+  documento_id BIGINT NN FK -> documentos.id;
+  pessoa_id BIGINT NN FK -> pessoas.id;
+  registrado_por_usuario_id BIGINT NN FK -> usuarios.id;
+  contrato_id BIGINT ? FK -> contratos.id;
+  manifestacao VARCHAR(10) NN, ACEITE ou CIENCIA;
+  canal VARCHAR(10) NN, MOBILE ou WEB.
+criado_em é o instante do registro. A API valida se o usuário pode representar a
+pessoa. Ciência do aviso de privacidade não é tratada automaticamente como
+consentimento para qualquer uso de dados. O fluxo aplicável deve ser definido.
+
+10.42. auditoria [H]
+Finalidade: rastreabilidade das alterações sensíveis.
+  id BIGINT PK AI;
+  ator_usuario_id BIGINT ? FK -> usuarios.id;
+  clube_id BIGINT ? FK -> clubes.id;
+  origem VARCHAR(15) NN, USUARIO, SISTEMA ou PROVEDOR;
+  acao VARCHAR(100) NN;
+  entidade VARCHAR(100) NN;
+  referencia_registro VARCHAR(100) NN;
+  correlacao_id CHAR(36) NN;
+  alteracoes JSON ?;
+  justificativa VARCHAR(1000) ?.
+entidade/referencia_registro são referências descritivas de auditoria, não FKs
+polimórficas que substituam as relações de negócio. Não registrar senha, token,
+documento inteiro ou escolha de voto. Restringir alteração e exclusão desta tabela.
+
+10.43. requisicoes_idempotentes [M]
+Finalidade: reutilizar o resultado de operações de negócio repetidas.
+  id BIGINT PK AI;
+  usuario_id BIGINT NN FK -> usuarios.id;
+  escopo VARCHAR(150) NN;
+  chave VARCHAR(100) NN;
+  hash_requisicao CHAR(64) NN;
+  status VARCHAR(15) NN, PROCESSANDO, CONCLUIDA ou FALHOU;
+  codigo_http SMALLINT ?;
+  resposta_json JSON ?;
+  expira_em DATETIME(6) NN;
+  UQ(usuario_id, escopo, chave).
+Mesma chave com conteúdo diferente retorna conflito. Gravar conclusão e efeito
+de negócio de forma atômica; não devolver sucesso antes do commit. Não armazenar
+respostas de login, senhas ou credenciais aqui. Webhooks usam eventos_provedor.
+
+
+11. RELACIONAMENTOS, INTEGRIDADE E CONCORRÊNCIA
+
+11.1. Cardinalidades principais
+
+- Estado 1:N cidades; cidade 1:N clubes e 1:N pessoas.
+- Pessoa 1:0..1 usuário; pessoa N:N interesses, por pessoas_interesses.
+- Clube 1:N atribuições de administradores locais; cada ADM_LOCAL tem 0..1
+  atribuição, devendo ter uma ativa para operar.
+- Plano 1:N versões; versão 1:N condições de pagamento.
+- Versão LOCAL N:N unidades onde pode ser contratada, por plano_versao_clubes.
+- Pessoa titular 1:N contratos históricos; unidade de origem 1:N contratos.
+- Contrato N:1 versão e N:1 condição; a condição deve pertencer à mesma versão.
+- Contrato 1:N membros, incluindo exatamente um titular.
+- Membro 1:N solicitações de vínculo e 1:N reservas históricas.
+- Contrato 1:N faturas; fatura 1:N pagamentos; pagamento 1:N tentativas de estorno,
+  com no máximo um estorno integral confirmado.
+- Clube 1:N áreas; área 1:N janelas semanais e 1:N ocupações.
+- Reserva 1:1 ocupação; evento 1:0..N ocupações, uma ou mais quando usa áreas internas.
+- Clube 1:N eventos; evento 1:N inscrições; pessoa 1:N inscrições.
+- Clube 1:N chamados; chamado 1:N mensagens particulares.
+- Clube 1:N mensagens de chat; mensagem 1:N denúncias.
+- Clube 1:N votações; votação 1:N opções e 1:N eleitores.
+- Eleitor 1:0..1 voto; opção 1:N votos; pessoa tem no máximo um eleitor por votação.
+- Usuário 1:N notificações, sessões, tokens e uploads.
+- Documento 1:N aceites; contrato 1:N aceites relacionados.
+
+Essas relações substituem a ligação direta "associado tem plano" do TXT original.
+O vínculo passa pelo contrato, permitindo renovação e preservação do preço e dos
+benefícios que estavam vigentes na contratação.
+
+11.2. Índices de consulta sugeridos
+
+Além de PKs, UQs e índices das FKs, avaliar com o plano real das consultas:
+
+- contratos(clube_origem_id, status, fim_em).
+- contratos(titular_pessoa_id, inicio_em, fim_em).
+- membros_contrato(contrato_id, tipo, status).
+- membros_contrato(pessoa_id, status).
+- solicitacoes_vinculo(status, criado_em).
+- faturas(status, vencimento); faturas(contrato_id, status, vencimento).
+- pagamentos(fatura_id, status); pagamentos(confirmado_em, conciliacao).
+- eventos_provedor(status, proxima_tentativa_em).
+- ocupacoes_area(area_id, status, inicio_em, fim_em).
+- eventos(clube_id, status, inicio_em).
+- inscricoes_evento(evento_id, status).
+- chamados(clube_id, status, criado_em).
+- mensagens_chamado(chamado_id, id).
+- mensagens_chat(clube_id, id).
+- moderacoes_chat(clube_id, usuario_id, inicio_em).
+- votacoes(clube_id, status, inicio_em, fim_em).
+- votos(votacao_id, opcao_id).
+- notificacoes(usuario_id, lida_em, id).
+- auditoria(clube_id, criado_em); auditoria(ator_usuario_id, criado_em).
+
+Não criar índices duplicados só porque a coluna aparece em mais de uma lista.
+Datas de fim e o intervalo de limpeza da agenda ainda exigirão filtragem da
+consulta; o índice não é uma restrição automática contra sobreposição.
+
+11.3. Regras que exigem serviços transacionais
+
+As FKs garantem existência e, nos casos compostos, coerência entre chaves. Elas
+não garantem por si só que um administrador tem permissão, que o titular é o
+correto, que a área está coberta pelo contrato ou que duas reservas não colidem.
+
+A API deverá validar explicitamente:
+
+- A função e a unidade de administradores_clubes.
+- A coincidência entre titular do contrato e membro TITULAR.
+- A ausência de vínculos simultâneos incompatíveis da mesma pessoa.
+- Cotas de beneficiários, quantidade de reservas futuras e capacidade de eventos.
+- A unidade de origem permitida por plano LOCAL.
+- A correspondência entre eleitor, pessoa autenticada, membro e unidade eleitoral.
+- A unidade do evento e das suas áreas; o pertencimento da mensagem de leitura
+  ao chat informado; a autorização para referenciar cada arquivo.
+- O total das faturas, o calendário de vencimentos e as aplicações de pagamento.
+- Condições de estado, datas e preenchimento dos campos obrigatórios por transição.
+
+11.4. Estratégia contra dupla reserva
+
+Aplicar a mesma estratégia a toda criação, cancelamento ou alteração de ocupação:
+
+1. Iniciar transação InnoDB e obter as linhas necessárias para revalidar vínculo.
+2. Bloquear a linha de areas correspondente por SELECT ... FOR UPDATE.
+3. Consultar ocupações atuais com leitura que veja o estado mais recente; não usar
+   uma fotografia antiga carregada antes da espera pelo bloqueio.
+4. Verificar conflito, funcionamento e limites, considerando os intervalos de
+   limpeza de ambas as ocupações. O período técnico bloqueado é [inicio_em,
+   fim_em + intervalo_apos_uso_minutos).
+5. Inserir reserva/ocupação, auditoria aplicável e notificação; concluir a transação.
+6. Só depois publicar o aviso SignalR e devolver a confirmação ao cliente.
+
+Bloquear a linha da área funciona mesmo se não houver nenhuma reserva prévia.
+Bloquear apenas reservas encontradas deixaria sem proteção o primeiro uso do espaço.
+O uso de FOR UPDATE exige uma transação efetiva. [T2]
+
+Para eventos com várias áreas, bloquear as áreas em ordem crescente de id. Não
+chamar serviços externos nem esperar interação humana com a transação aberta.
+Levar em conta a vigência do contrato para o uso solicitado e validar toda a janela
+da área, incluindo limpeza. Mudanças de funcionamento precisam respeitar ocupações
+futuras já confirmadas ou resolver os conflitos antes da publicação da mudança.
+
+11.5. Outros pontos de concorrência
+
+- Contratação/aprovação: bloquear as pessoas afetadas e o contrato, revalidar
+  exclusividade e cotas, e gravar a decisão junto com o estado do membro.
+- Reservas de áreas diferentes pelo mesmo titular: bloquear também o contrato
+  para que duas operações não ultrapassem juntas a cota de reservas futuras.
+- Pagamento/estorno: bloquear contrato, fatura e pagamento na ordem acordada,
+  revalidar e alterar aplicação, fatura e auditoria atomicamente.
+- Voto: bloquear a votação, validar o prazo no instante da gravação, verificar o
+  eleitor e inserir o voto protegido pela UNIQUE. Encerramento usa o mesmo bloqueio.
+- Inscrição: bloquear o evento antes de contar vagas e confirmar inscrição.
+- Repetição de requisição: reservar a chave idempotente em índice único antes
+  de executar o efeito e retornar o resultado previamente gravado quando aplicável.
+
+Adotar uma ordem global consistente de bloqueios em cada conjunto de fluxos que
+compartilhe recursos. Operações que encontrem deadlock devem desfazer a transação
+inteira e, quando idempotentes, repetir de forma limitada. Não repetir apenas metade
+de uma baixa ou de um voto. A implementação deverá testar disputas com conexões
+de banco diferentes, e não somente com chamadas sequenciais.
+
+11.6. Criação inicial do esquema
+
+Criar as tabelas respeitando dependências. Um caminho possível é:
+estados/cidades; clubes/pessoas/usuarios; documentos/arquivos; autenticação e
+atribuições administrativas; interesses; planos/versões/condições; contratos e
+membros; solicitações e financeiro; áreas/horários/eventos/reservas/ocupações;
+atendimentos/chat; votações/opções/eleitores/votos; notificações, auditoria e
+idempotência. FKs autorreferentes serão criadas com os respectivos campos opcionais.
+
+Não desligar foreign_key_checks para acomodar erros de modelagem. Executar migrações
+versionadas em banco vazio e em uma cópia de banco existente. Constraints devem
+receber nomes únicos e compreensíveis. Validar o DDL final no MySQL escolhido,
+incluindo colunas geradas, CHECKs e FKs compostas.
+
+
+12. CONTRATOS DA API E COMUNICAÇÃO EM TEMPO REAL
+
+12.1. Convenções
+
+Prefixo sugerido: /api/v1. Comunicação JSON em UTF-8. Arquivos usarão envio
+multipart ou fluxo privado equivalente. Datas de instantes usarão ISO 8601 com
+offset explícito; o servidor armazenará UTC. Vencimentos e nascimentos usarão
+AAAA-MM-DD. DTOs financeiros usarão números decimais, sem textos como "R$ 100,00".
+
+Identidade do autor sempre virá da autenticação. O cliente não decidirá quem é o
+titular, se pode votar, qual é o preço confirmado ou qual papel administrativo tem.
+Selecionar um beneficiário em uma operação autorizada exige validação do vínculo.
+
+As rotas abaixo são o contrato inicial de capacidades; nomes finais e DTOs completos
+deverão ser consolidados no OpenAPI antes da integração das telas.
+
+12.2. Grupos de endpoints propostos
+
+AUTENTICAÇÃO E PERFIL
+POST /auth/cadastro — criar conta pública ASSOCIADO.
+POST /auth/login — autenticar e abrir sessão.
+POST /auth/renovar — rotacionar credencial de renovação.
+POST /auth/logout — revogar a família da sessão autenticada.
+POST /auth/recuperacao — iniciar recuperação sem enumerar contas.
+POST /auth/redefinir-senha — consumir token de uso único.
+POST /auth/verificar-email — confirmar o contato.
+GET/PATCH /me — consultar/atualizar campos próprios permitidos.
+GET /me/permissoes — informar ações e unidades autorizadas para a interface.
+
+UNIDADES E PLANOS
+GET /clubes; GET /clubes/{id} — catálogo público reduzido.
+GET /planos; GET /planos/{id}/versoes — ofertas publicadas e condições.
+GET /me/unidades — unidades efetivamente autorizadas para o usuário.
+POST/PATCH /admin/clubes — manutenção restrita ao ADM_GERAL.
+POST/PATCH /admin/administradores — contas locais e seus vínculos, ADM_GERAL.
+POST/PATCH /admin/planos — catálogo global, versões e publicação, ADM_GERAL.
+
+CONTRATOS E MEMBROS
+POST /contratos — contratação com chave de idempotência.
+GET /me/contratos; GET /contratos/{id} — consulta conforme vínculo e perfil.
+POST /contratos/{id}/renovacoes — proposta de renovação.
+POST /contratos/{id}/solicitacoes-vinculo — inclusão, correção ou remoção.
+GET /contratos/{id}/membros — beneficiários autorizados.
+GET /admin/solicitacoes-vinculo — fila da unidade ou da rede.
+POST /admin/solicitacoes-vinculo/{id}/decisao — decisão transacional.
+
+FINANCEIRO
+GET /me/faturas; GET /faturas/{id} — somente titular e administração autorizada.
+POST /faturas/{id}/pagamentos — iniciar pagamento, sem informar "pago=true".
+POST /pagamentos/{id}/comprovante — anexar evidência no modo manual.
+POST /admin/pagamentos/{id}/confirmacao — ADM_GERAL, com justificativa/referência.
+POST /admin/pagamentos/{id}/rejeicao — ADM_GERAL.
+POST /admin/pagamentos/{id}/estornos — ADM_GERAL, sem apagar o original.
+POST /integracoes/pagamentos/{provedor}/webhook — autenticação do provedor,
+sem tratar o webhook como se fosse um usuário administrativo comum.
+GET /admin/financeiro — relatórios autorizados e filtros.
+
+ÁREAS, RESERVAS E EVENTOS
+GET /clubes/{id}/areas — áreas visíveis ao membro autorizado.
+GET /areas/{id}/disponibilidade?inicio=...&fim=... — consulta indicativa.
+POST /reservas — membro, área, início, fim e participantes validados no servidor.
+GET /me/reservas; POST /reservas/{id}/cancelamento.
+POST/PATCH /admin/areas; POST /admin/areas/{id}/bloqueios.
+GET /clubes/{id}/eventos — visibilidade conforme público e vínculo.
+POST/PATCH /admin/eventos; POST /admin/eventos/{id}/publicacao.
+POST /eventos/{id}/inscricoes; POST /inscricoes/{id}/cancelamento.
+POST /admin/eventos/{id}/presencas — registrar presença dos inscritos.
+
+ATENDIMENTO, CHAT E NOTIFICAÇÕES
+POST /chamados; GET /me/chamados; GET /chamados/{id}.
+GET/POST /chamados/{id}/mensagens — conversa privada com autorização.
+PATCH /admin/chamados/{id} — estado, atribuição e solução.
+GET /clubes/{id}/chat/mensagens?antesId=...&limite=50.
+POST /clubes/{id}/chat/mensagens — envio idempotente, também reutilizável pelo hub.
+POST /chat/mensagens/{id}/denuncias.
+POST /admin/chat/mensagens/{id}/moderacao.
+GET /me/notificacoes; POST /notificacoes/{id}/leitura.
+POST /arquivos; GET /arquivos/{id}/conteudo — validação e download privado.
+
+VOTAÇÕES
+GET /me/votacoes; GET /votacoes/{id}.
+POST /votacoes/{id}/votos — escolha única; eleitor resolvido pela identidade.
+GET /votacoes/{id}/resultados — agregado autorizado, após encerramento.
+POST/PATCH /admin/votacoes — manutenção local em rascunho.
+POST /admin/votacoes/{id}/publicacao.
+POST /admin/votacoes/{id}/encerramento ou /cancelamento.
+
+Rotas de atualização administrativa com identificador deverão usar /{id} no
+recurso correspondente. O prefixo /admin organiza a API, mas a segurança depende
+das políticas de autorização, não do nome da URL.
+
+12.3. Respostas e erros
+
+200: consulta ou atualização concluída; 201: recurso criado; 204: operação sem
+corpo; 400: dados inválidos; 401: não autenticado; 403: ação proibida; 404: recurso
+inexistente ou não revelável ao solicitante; 409: conflito de agenda, versão,
+capacidade ou idempotência; 429: excesso de requisições; 503: indisponibilidade
+temporária de serviço essencial.
+
+Erros seguirão Problem Details, com código de negócio e correlação. Exemplos de
+códigos: RESERVA_CONFLITANTE, LIMITE_BENEFICIARIOS, VOTO_JA_REGISTRADO,
+UNIDADE_NAO_AUTORIZADA, PAGAMENTO_DIVERGENTE e VERSAO_DESATUALIZADA.
+
+A resposta de conflito de reserva não deve revelar nome/telefone de quem ocupa
+o horário. Em erros financeiros, mostrar orientação para conciliação sem expor
+segredos do provedor. Falha de chamada não significa necessariamente que a operação
+não foi gravada; consultar o resultado usando a mesma chave idempotente.
+
+12.4. SignalR e entrega de mensagens
+
+Hubs sugeridos: /hubs/chat e /hubs/notificacoes. A API decide quais grupos o usuário
+pode acessar. Um nome de grupo como "clube:10" não é uma autorização. Validar
+ingresso, envio e mudanças de vínculo; desconectar ou remover conexões quando a
+permissão expirar ou for revogada. O SignalR não deve depender apenas das informações
+de identidade capturadas no momento da conexão. [T4]
+
+Mensagens serão persistidas antes de distribuir o evento. Se a conexão cair depois
+da gravação, o mesmo id_cliente devolve o registro existente. O cliente elimina
+duplicatas por id do servidor, restabelece a conexão e recupera lacunas pela API.
+Não prometer entrega "exatamente uma vez" pelo transporte.
+
+Atualizações de contrato, aprovação, cobrança e moderação deverão invalidar a
+autorização em cache quando necessário. Clientes que recebam uma notificação
+buscarão o estado atual pela API. Se o aviso em tempo real falhar, o registro
+durável continuará disponível na consulta e na próxima sincronização.
+
+12.5. Integração financeira
+
+O adaptador do provedor deve definir: criação de cobrança, consulta de situação,
+expiração, cancelamento, confirmação e estorno. Registrar a chave idempotente e
+o identificador externo antes de concluir o fluxo. Em timeout, consultar a cobrança
+existente antes de emitir outra.
+
+O tratamento do webhook verificará autenticação/assinatura, identificador do
+evento, correspondência de fatura, moeda e valor. Usar caixa de entrada durável
+em eventos_provedor e responder conforme o contrato do provedor. Não segurar uma
+transação MySQL durante uma chamada externa. Pagamento confirmado depois de uma
+proposta cancelada deve entrar em conciliação, sem ativação silenciosa.
+
+
+13. SQLITE, SESSÃO E SINCRONIZAÇÃO
+
+13.1. Dados locais propostos
+
+- Resumo do usuário e de suas permissões conhecidas, com data de atualização.
+- Unidades autorizadas, catálogo de planos e eventos permitidos.
+- Resumo de contrato e beneficiários conforme o perfil.
+- Faturas do próprio titular, com indicação de que a situação precisa de consulta
+  online para confirmação atual.
+- Próprias reservas, resumo de chamados e notificações.
+
+Não copiar o MySQL inteiro. Não guardar senhas, hash de senha, dados de cartão,
+segredos, votos individuais ou documentos de identificação no SQLite. Na primeira
+versão, mensagens privadas e histórico do chat serão consultados online, sem cache
+persistente local por padrão. Metadados e arquivos de um usuário não serão visíveis
+à próxima conta no mesmo aparelho.
+
+13.2. Política de atualização
+
+- Sincronizar após login, retorno do app ao primeiro plano, atualização manual e
+  confirmação de operação relevante.
+- Usar paginação e registrar data da sincronização. No início, recarregar por
+  recurso é aceitável; não depender de sincronização integral a cada abertura.
+- Cada cache privado terá usuario_id e, quando aplicável, clube_id. Preferir banco
+  separado por conta, além dos filtros de acesso.
+- Revogação, remoção ou perda de permissão exige remover dados locais que deixaram
+  de ser autorizados na próxima comunicação.
+- Uma sincronização futura por alterações incrementais precisará incluir registros
+  removidos/inativados. Apenas buscar atualizado_em > ultima_data não resolve exclusões.
+- Usar versão do servidor para conflitos. O dado oficial prevalece sobre cópia antiga.
+
+13.3. O que funciona sem internet
+
+Consulta de dados já armazenados, com aviso de desatualização. É possível preparar
+um rascunho de chamado sem enviar, se ficar restrito à conta que o criou.
+
+Não confirmar offline: assinatura, aprovação, reserva, pagamento, voto, inscrição
+com limite de vagas ou envio de chat. Essas ações exigem consulta e gravação no
+servidor. A interface não exibirá sucesso antes dessa confirmação.
+
+A ausência de conexão impede detectar imediatamente uma revogação remota. Por
+isso, o cache será reduzido e a consulta privada offline dependerá de uma validade
+local limitada da sessão. Credencial expirada exigirá reconexão/reautenticação.
+
+13.4. Sessão persistente e logout
+
+Fechar o app não executa logout. A renovação poderá manter o acesso enquanto a
+sessão for válida. SecureStorage do MAUI será usado para pequenos segredos de
+sessão, com tratamento de falhas e particularidades da plataforma. [T5]
+
+Ao sair: encerrar conexões SignalR, limpar credenciais, banco privado, anexos
+temporários e rascunhos da conta; revogar a sessão no servidor se houver conexão.
+Logout offline limpa o dispositivo, mas não pode prometer revogação remota imediata.
+As sessões remotas terão expiração e gerenciamento de revogação quando online.
+
+Não guardar a senha para autenticar novamente em silêncio. Ao restaurar o app em
+outro dispositivo ou encontrar armazenamento seguro inválido, solicitar novo login.
+
+
+14. TELAS PREVISTAS
+
+14.1. Mobile
+
+Entrada e recuperação de acesso; catálogo de unidades; comparação de planos;
+cadastro e contratação; apresentação dos termos; pagamento e confirmação;
+início do associado com unidade selecionada; meu contrato; beneficiários e
+solicitações; lista de faturas e histórico; áreas e disponibilidade; formulário
+de reserva; minhas reservas; eventos e inscrições; chat da unidade; chamados e
+conversa particular; votações e resultado; notificações; perfil/interesses; sessões
+e saída da conta.
+
+As telas adaptarão os botões ao perfil de membro. Dependente não verá atalhos
+de voto ou gestão financeira do titular. Bloqueios indicarão o motivo e o caminho
+para resolver, como consultar a cobrança ou abrir atendimento.
+
+14.2. Web do ADM_GERAL
+
+Login; visão consolidada; clubes; administradores locais; planos, versões e
+condições; associados e contratos; pagamentos/comprovantes; estornos e divergências;
+relatórios financeiros; acompanhamento de reservas, eventos, chamados, votações
+e moderação; auditoria; documentos e políticas.
+
+14.3. Web do ADM_LOCAL
+
+Login; painel da unidade; associados e benefícios; análise de dependentes e
+convidados; áreas e horários; agenda integrada; reservas; eventos/inscrições;
+chamados e conversa particular; votações; moderação do chat; avisos locais.
+
+As telas Web não criarão login público de associado. A consulta pública de eventos
+abertos permanece no Mobile, mantendo o sistema Web restrito aos dois tipos de ADM.
+
+
+15. CRITÉRIOS DE ACEITAÇÃO
+
+Os cenários abaixo deverão ser executados quando cada módulo for implementado.
+O vínculo aos RFs permite verificar se o comportamento solicitado foi entregue.
+
+CA-01 — Cadastro e perfis (RF-002, 003, 005, 007)
+Cadastrar titular, ADM_LOCAL e dependente com conta própria. Tentar criar ADM_GERAL
+pelo cadastro público e alterar perfil no payload. Esperado: contas corretas são
+criadas pelo fluxo autorizado; escalada de privilégio é rejeitada.
+
+CA-02 — Isolamento entre unidades (RF-008, 015, 048)
+Administrador de A tenta ler/alterar registros e baixar documentos de B, inclusive
+por ID conhecido. Esperado: acesso negado, sem vazamento do cadastro. ADM_GERAL
+acessa o recurso dentro das suas atribuições e a ação sensível é auditada.
+
+CA-03 — Plano local e plano rede (RF-009 a 013, 036)
+Local da unidade A tenta reservar ou entrar no chat de B. Rede escolhe B.
+Esperado: local é impedido; rede acessa B se o vínculo estiver habilitado. Ambos
+mantêm a unidade eleitoral de origem. Testar duas unidades na mesma cidade.
+
+CA-04 — Condições financeiras (RF-010, 012, 018)
+Contratar anual à vista e anual em 12 parcelas. Esperado: uma e doze faturas,
+respectivamente; soma igual ao total; vencimentos mensais corretos em fevereiro
+e meses de 30/31 dias. Preço enviado adulterado pelo cliente é desconsiderado.
+
+CA-05 — Histórico comercial (RF-009, 012, 017)
+Publicar nova versão com outro preço e limite. Esperado: contrato antigo conserva
+o que foi contratado. Renovação usa a nova oferta aceita, sem sobrescrever faturas.
+
+CA-06 — Aprovação e cotas (RF-014 a 016)
+Cadastrar dependente e convidado, testar rejeição e aprovação. Enviar duas aprovações
+concorrentes para a última vaga. Esperado: pendentes não acessam benefícios e apenas
+a quantidade autorizada é aprovada, com responsável e histórico.
+
+CA-07 — Identidade e menor (RF-002, 014, 049)
+Reutilizar CPF existente e tentar vincular pessoa sem autorização. Esperado:
+não duplicar cadastro nem revelar dados privados. Quando necessário, exigir
+responsável validado, sem presumir que titular é sempre responsável legal.
+
+CA-08 — Pagamento manual (RF-019 a 021)
+Enviar comprovante, tentar confirmação como ADM_LOCAL e depois como ADM_GERAL.
+Esperado: comprovante em análise; ADM_LOCAL impedido; confirmação geral quita
+a fatura somente após validação e registra auditoria.
+
+CA-09 — Webhook e duplicidade (RF-020, 022)
+Reenviar o mesmo evento, enviar evento inválido, inverter a ordem das notificações
+e simular dois recebimentos. Esperado: autenticação obrigatória, deduplicação,
+sem regressão indevida, uma quitação aplicada e excedente em conciliação.
+
+CA-10 — Estorno e inadimplência (RF-022 a 024)
+Estornar quitação válida; quitar dívida após tolerância; testar fatura futura.
+Esperado: reversão rastreável, estado financeiro coerente, liberação após
+regularização e nenhuma inadimplência atribuída a parcela ainda não vencida.
+
+CA-11 — Reserva concorrente (RF-026, 027)
+Dois titulares enviam simultaneamente reservas sobrepostas para uma área vazia.
+Esperado: apenas uma confirmação; a outra recebe conflito. Repetir com áreas
+diferentes para confirmar que elas não se bloqueiam sem necessidade.
+
+CA-12 — Limites temporais (RF-025, 027, 029)
+Testar início igual ao fim, reserva atravessando meia-noite, limpeza, manutenção,
+antecedência, horário fechado e fim após o contrato. Esperado: rejeitar intervalos
+inválidos; aceitar intervalos válidos, inclusive datas diferentes, sem sobreposição.
+
+CA-13 — Agenda compartilhada (RF-028 a 032)
+Publicar evento na área reservada e cancelar reserva/evento. Esperado: conflito
+é impedido; cancelamento libera exatamente suas ocupações e mantém o histórico.
+Alterar horário de funcionamento não invalida reservas silenciosamente.
+
+CA-14 — Lotação de evento (RF-030, 031)
+Duas pessoas disputam a última vaga. Esperado: uma inscrição confirmada; repetição
+da mesma inscrição não consome outra vaga. Externo em evento público não recebe
+acesso ao chat ou direitos associativos.
+
+CA-15 — Atendimento privado (RF-033, 034)
+Abrir chamado e trocar mensagens com a administração. Outro titular, convidado
+adulto ou administrador de outra unidade tenta acessar. Esperado: conversa
+permanece restrita aos participantes autorizados e mantém protocolo.
+
+CA-16 — Chat e reconexão (RF-035 a 037)
+Enviar mensagem, perder conexão após persistência e reenviar com o mesmo id_cliente.
+Esperado: uma mensagem registrada, retomada do histórico e ausência de duplicata.
+Revogar o vínculo com o socket aberto: conexão/grupo deixa de receber dados
+protegidos e novos envios são bloqueados.
+
+CA-17 — Moderação (RF-037)
+Denunciar mensagem, aplicar suspensão e tentar enviar. Esperado: ação local
+auditada, mensagem oculta quando procedente e atendimento privado ainda acessível.
+
+CA-18 — Elegibilidade do voto (RF-039, 040)
+Testar titular local, titular de origem diferente, dependente, convidado e ADM
+sem vínculo de titular. Esperado: somente o titular elegível vota. Verificar o
+parâmetro de adimplência nos dois valores, sem importar bloqueios de outros serviços.
+
+CA-19 — Voto único e integridade (RF-041)
+Enviar dois votos simultâneos da mesma pessoa e usar opção de outra votação.
+Esperado: um voto persistido; tentativa cruzada rejeitada por validação e FK;
+repetição idempotente devolve o registro existente, sem mudar a escolha.
+
+CA-20 — Prazo e resultado (RF-039, 042)
+Votar no limite de encerramento, simular rotina agendada atrasada e empate.
+Esperado: horário do servidor governa a aceitação; apuração só após encerramento;
+quórum e empate apresentados corretamente, sem revelar votos individuais.
+
+CA-21 — Cache entre contas (RF-004, 043, 044)
+Sincronizar dados de A, sair, entrar como B e reiniciar o app. Esperado: nenhum
+dado privado de A aparece para B. Fechar sem logout preserva somente a sessão
+válida de A. Offline não confirma operações que dependem do servidor.
+
+CA-22 — Restrições e auditoria (RF-045, 047, 050)
+Desativar plano/unidade e tentar novas operações; consultar contratos antigos.
+Esperado: novas operações bloqueadas conforme a regra, históricos preservados
+e efeitos administrativos registrados, sem exclusão em cascata.
+
+CA-23 — Falha no meio da transação (RF-018, 022, 027, 041, 048)
+Interromper gravação entre reserva e ocupação, pagamento e baixa, contrato e
+faturas, ou voto e confirmação. Esperado: rollback completo ou resultado completo
+recuperável, nunca sucesso parcial.
+
+CA-24 — Segurança de arquivos e dados (RF-015, 020, 033; RNF-007, 022)
+Enviar arquivo inválido, exceder tamanho e solicitar anexo de terceiro por ID.
+Esperado: rejeição e acesso privado; logs não contêm documentos ou credenciais.
+
+CA-25 — Operação e recuperação (RNF-011 a 013, 016 a 020)
+Medir metas em ambiente documentado, interromper API e restaurar backup em ambiente
+isolado. Esperado: erros tratados, banco/arquivos consistentes, métricas registradas
+e restauração comprovada dentro dos objetivos adotados.
+
+
+16. SEQUÊNCIA DE IMPLEMENTAÇÃO
+
+ETAPA 1 — Fundação
+Fechar as decisões necessárias da seção 17; fixar versões; criar solução, Git,
+configurações de exemplo, banco/migrações, autenticação e permissões; provisionar
+ADM_GERAL. Validar isolamento entre unidades antes de construir as telas restantes.
+
+ETAPA 2 — Associação
+Implementar unidades, pessoas, planos, versões, contratação, membros e aprovação.
+Integrar fluxo Mobile de adesão e telas Web de cadastro. Usar dados fictícios.
+
+ETAPA 3 — Financeiro
+Implementar geração de faturas, comprovantes, confirmação geral, relatórios e
+estornos. Integrar provedor em ambiente de testes, depois homologar eventos e
+conciliação antes de aceitar dinheiro real.
+
+ETAPA 4 — Agenda e eventos
+Implementar áreas, horários, ocupações, reservas, bloqueios, eventos e inscrições.
+Executar os testes de concorrência com MySQL real.
+
+ETAPA 5 — Atendimento e comunicação
+Implementar chamados e conversa particular; chat geral por unidade; moderação;
+notificações persistentes e SignalR; sincronização e logout completos no Mobile.
+
+ETAPA 6 — Votação
+Implementar eleitorado, opções, voto único, encerramento e apuração. Homologar
+as permissões e as regras aprovadas de representação e adimplência.
+
+ETAPA 7 — Integração e entrega
+Validar todos os critérios de aceitação, documentação de instalação, backups,
+tratamento de erros, dispositivos-alvo, testes de recuperação e configuração
+de produção. Publicar o código sem dados reais, senhas, tokens ou arquivos privados.
+
+Conclusão de uma etapa não dispensa os requisitos essenciais de segurança e
+integridade. A primeira entrega demonstrável pode ocorrer antes da conclusão de
+todas as etapas, mas deve informar quais funcionalidades ainda estão pendentes.
+
+
+17. PARÂMETROS E DECISÕES A VALIDAR
+
+Não é necessário responder tudo para compreender o projeto. Esta lista registra
+as decisões que precisam ser fechadas antes de implementar o respectivo módulo.
+
+D-01 — Preços e benefícios de cada plano: nomes, valores, duração, parcelas,
+limites de dependentes/convidados e quantidade máxima de reservas futuras.
+Não há preços ou cotas comerciais definitivos nesta especificação.
+
+D-02 — Cobertura: confirmar a proposta de LOCAL por unidade e REDE incluindo
+novas unidades. Se houver plano por cidade, região ou conjunto específico,
+acrescentar abrangência e cobertura contratual próprias antes da implementação.
+
+D-03 — Associação e idade: proposta inicial de titular maior de 18 anos; definir
+documentos, categorias de dependência e autorização para contas de menores.
+A idade é uma decisão proposta, não uma regra já informada nas fontes.
+
+D-04 — Vigência e proposta: definir data inicial, prazo para primeiro pagamento
+e duração de validade da oferta pendente. Sugestão técnica: proposta de 48 horas;
+o meio de pagamento pode exigir prazo diferente. Prever pagamento tardio.
+
+D-05 — Renovação e mudança: confirmar mudança de plano apenas na renovação e
+política de manutenção dos beneficiários. Transferência de unidade de origem e
+titularidade, se necessárias, precisam de fluxo próprio, inclusive efeito eleitoral.
+
+D-06 — Inadimplência: definir tolerância de cada plano e efeitos sobre benefícios.
+O campo tem padrão técnico 0, mas deve ser escolhido conscientemente antes da
+publicação. Confirmar se inscrições em eventos restritos também serão bloqueadas;
+proposta de base: exigir regularidade para novas inscrições de associados.
+
+D-07 — Cancelamento e devolução: definir condições de encerramento antecipado,
+cobranças futuras, devolução e tratamento de reserva já confirmada após suspensão.
+Não presumir multas, juros, perdão de dívida ou restituição automática.
+
+D-08 — Pagamento online: selecionar provedor e meios reais, credenciais de teste,
+processo de conciliação e política de estorno. Boleto real depende dessa integração;
+não criar uma linha digitável fictícia e apresentá-la como cobrança bancária válida.
+
+D-09 — Reservas: limites de duração, funcionamento, antecedência e cancelamento
+serão definidos por área. Sugestão inicial de cancelamento: até 24 horas antes,
+parametrizado, sem assumir esse prazo para todas as unidades.
+
+D-10 — Voto: confirmar unidade eleitoral de origem, exigência opcional de
+adimplência, quórum, prazo e escolha única. Se sigilo do voto for necessário,
+o modelo votos/eleitores deverá ser redesenhado antes de implementação; esconder
+o nome na tela não torna esta base anônima.
+
+D-11 — Chat: confirmar participação de dependentes/convidados com conta aprovada,
+regras para menores, moderação e retenção. Sem dependência obrigatória de GPS.
+
+D-12 — Eventos externos: confirmar se inscrição de público externo continuará
+sendo registrada na Web pelo ADM_LOCAL ou se será criado autoatendimento público.
+Ingressos pagos e cobranças por locação são extensões futuras, não cobertos pela
+base financeira exclusiva de parcelas de associação.
+
+D-13 — Administração: confirmar um clube por ADM_LOCAL e possibilidade de mais
+de um administrador na unidade. Toda atribuição será feita pelo ADM_GERAL.
+
+D-14 — Dados e operação: definir prazos de retenção por categoria, tratamento de
+documentos e menores, política de backups, hospedagem, contatos de suporte e
+contingência de acesso administrativo. Não existe promessa de retenção eterna.
+
+D-15 — Plataforma e tecnologia: confirmar primeiro alvo Android, ferramentas
+disponíveis, versão do .NET/MAUI/MySQL e estratégia de acesso a dados. Manter MVC
+na Web como informado no documento original.
+
+D-16 — Metas de serviço: aprovar ou ajustar os objetivos de desempenho,
+disponibilidade e recuperação, conforme a infraestrutura e o orçamento escolhidos.
+
+D-17 — Simpatizante e visitante: confirmar se são apenas público de evento ou
+categorias adicionais. Na base atual, CONVIDADO é beneficiário aprovado de contrato;
+ele não é sinônimo de qualquer pessoa que visite um evento aberto.
+
+
+18. CORREÇÕES DO MODELO ORIGINAL E REFERÊNCIAS TÉCNICAS
+
+18.1. Correções estruturais realizadas
+
+- ADMINISTRADOR_GERAL e ADMINISTRADOR_LOCAL deixam de duplicar pessoas, endereço
+  e senha. Seus dados ficam em pessoas/usuarios; a atuação local fica em
+  administradores_clubes.
+- ASSOCIADOS é substituída pela separação pessoa, usuário, contrato e membro.
+  Isso evita tratar um dependente sem login como uma conta com senha obrigatória.
+- TIPO_SOCIOS passa a ser um conjunto fechado no vínculo: TITULAR, DEPENDENTE,
+  CONVIDADO. Não se concede voto por uma categoria editável livremente no cadastro.
+- DEPENDENTES deixa de ser um número armazenado no titular. Quantidades são
+  calculadas dos vínculos e comparadas com os limites do plano.
+- PLANO_ID direto na pessoa é substituído pela referência contratual a uma versão
+  imutável, com condição de pagamento e histórico de vigência.
+- O simples VALOR em PLANOS dá lugar a condições de pagamento e a valores
+  contratados/faturados, distinguindo anuidade à vista de parcelamento anual.
+- AREA_RESERVADA em texto é substituída por areas e ocupacoes_area com FKs.
+- Datas e horários separados são substituídos por inicio_em/fim_em completos,
+  mantendo TIME apenas para janelas semanais de funcionamento.
+- A agenda passa a unificar reserva, evento e manutenção para impedir conflitos.
+- Interesses mantêm relação N:N, agora ligada à pessoa e protegida por PK composta.
+- Foram incluídos os modelos ausentes de eventos, cobranças, pagamentos, estornos,
+  aprovação, atendimento, chat, votação, notificações, arquivos e auditoria.
+- CPF, endereço, dinheiro, datas e senha receberam tipos e regras apropriados.
+- Quantidades, resultados e situações calculáveis não foram duplicados como fontes
+  independentes que possam divergir; por exemplo, "vencida" deriva da fatura aberta
+  e do vencimento, e resultado de votação deriva dos votos válidos.
+
+18.2. Fontes do escopo
+
+S1 — Descrição do VanderClub fornecida nesta solicitação.
+S2 — Arquivo "ESPECIFICAÇÕES  — VanderClub.txt" anexado.
+S3 — Fotografia "WhatsApp Image 2026-10-28 at 21.18.53(1).jpeg": rede, unidades,
+cadastro, dependentes, administradores, eventos, mensalidades e tipos de associado.
+S4 — Fotografia "WhatsApp Image 2026-10-28 at 21.19.12(1).jpeg": gestão geral,
+eventos, aprovação de vínculos, atendimento, espaços e situação de mensalidades.
+
+Quando houve divergência, prevaleceu a solicitação atual: dois tipos de ADM na
+Web e pagamento sob responsabilidade do ADM_GERAL. As novas decisões de produto
+estão sinalizadas nas seções 1 e 17, para não confundir proposta com requisito
+original. O desenho de tabelas, fluxos e critérios de aceitação é a proposta
+de engenharia elaborada para este projeto.
+
+18.3. Referências técnicas oficiais consultadas em 02/11/2026
+
+As fontes abaixo fundamentam mecanismos técnicos; não definem as regras
+associativas ou comerciais do VanderClub.
+
+[T1] MySQL 8.4 — FOREIGN KEY Constraints.
+https://dev.mysql.com/doc/refman/8.4/en/create-table-foreign-keys.html
+Referência para integridade referencial, índices e ações de exclusão/atualização.
+
+[T2] MySQL 8.4 — Locking Reads.
+https://dev.mysql.com/doc/refman/8.4/en/innodb-locking-reads.html
+Referência para leitura com bloqueio em transações. A estratégia de agenda
+proposta neste documento usa esse mecanismo, mas deve ser validada na implementação.
+
+[T3] MySQL 8.4 — CHECK Constraints.
+https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html
+Referência para validações de linha e limitações das expressões CHECK.
+
+[T4] Microsoft — Authentication and authorization in ASP.NET Core SignalR.
+https://learn.microsoft.com/en-us/aspnet/core/signalr/authn-and-authz?view=aspnetcore-10.0
+Referência para autenticação de conexões e revalidação de autorização durante seu uso.
+
+[T5] Microsoft — Secure storage, .NET MAUI.
+https://learn.microsoft.com/en-us/dotnet/maui/platform-integration/storage/secure-storage?view=net-maui-10.0
+Referência para armazenamento de pequenos segredos no dispositivo e tratamento
+de particularidades da plataforma.
+
+[T6] MySQL 8.4 — Date and Time Data Type Syntax.
+https://dev.mysql.com/doc/refman/8.4/en/date-and-time-type-syntax.html
+Referência para tipos temporais e precisão de frações de segundo.
+
+FIM DO DOCUMENTO
+
+
